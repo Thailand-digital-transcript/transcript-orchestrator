@@ -11,7 +11,7 @@ import com.wpanther.transcript.orchestrator.domain.repository.BatchRepository;
 import com.wpanther.transcript.orchestrator.domain.repository.TranscriptItemRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,7 +28,7 @@ import java.util.List;
  * owns correlationId lifecycle).
  */
 @Slf4j
-@Component
+@Service
 @RequiredArgsConstructor
 public class StuckPhaseSweepTask {
 
@@ -39,6 +39,17 @@ public class StuckPhaseSweepTask {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void reEmit(Batch batch) {
+        // C1 fix: re-load the batch inside this REQUIRES_NEW TX so the version
+        // field reflects the latest persisted state. The outer sweep() loaded
+        // these objects outside any TX; another orchestrator instance may have
+        // advanced the batch in the meantime, making the in-memory `version`
+        // stale and causing OptimisticLockingFailureException on save.
+        Batch fresh = batchRepository.findById(batch.getId()).orElse(null);
+        if (fresh == null) {
+            log.debug("Batch {} disappeared between sweep discovery and re-emit — skipping", batch.getId());
+            return;
+        }
+        batch = fresh;
         switch (batch.getStatus()) {
             case REGISTRAR_SIGNING -> reSign(batch, ItemStatus.ASSIGNED, SignerRole.REGISTRAR, SigningFormat.XML);
             case DEAN_SIGNING      -> reSign(batch, ItemStatus.REGISTRAR_SIGNED, SignerRole.DEAN, SigningFormat.XML);

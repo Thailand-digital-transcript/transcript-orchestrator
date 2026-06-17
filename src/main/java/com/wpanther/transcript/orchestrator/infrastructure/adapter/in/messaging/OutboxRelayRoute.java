@@ -8,6 +8,7 @@ import org.apache.camel.ProducerTemplate;
 import org.apache.camel.builder.RouteBuilder;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j @Component
@@ -16,6 +17,10 @@ import java.util.List;
 public class OutboxRelayRoute extends RouteBuilder {
 
     private static final int BATCH_SIZE = 100;
+    // I5 fix: FAILED outbox events are now retried on every tick. Once an event
+    // exceeds MAX_RETRIES attempts it stays FAILED for manual intervention
+    // (no terminal DEAD state in OutboxStatus yet) and a final log line is emitted.
+    private static final int MAX_RETRIES = 5;
 
     private final OutboxEventRepository outboxRepository;
     private final ProducerTemplate producerTemplate;  // Camel Spring Boot auto-configures one bean
@@ -29,8 +34,21 @@ public class OutboxRelayRoute extends RouteBuilder {
     }
 
     private void drainPending(Exchange exchange) {
+        // I5 fix: pick up FAILED events in addition to PENDING. Failed events
+        // with retryCount >= MAX_RETRIES are skipped (no point hammering on a
+        // permanently broken payload). Slot the remaining capacity with failed
+        // events before exhausting the PENDING batch.
         List<OutboxEvent> pending = outboxRepository.findPendingEvents(BATCH_SIZE);
-        exchange.getIn().setBody(pending.isEmpty() ? List.of() : pending);
+        int remaining = Math.max(0, BATCH_SIZE - pending.size());
+        List<OutboxEvent> failed = remaining > 0
+            ? outboxRepository.findFailedEvents(remaining) : List.of();
+        List<OutboxEvent> retryable = failed.stream()
+            .filter(e -> e.getRetryCount() < MAX_RETRIES)
+            .toList();
+        List<OutboxEvent> all = new ArrayList<>(pending.size() + retryable.size());
+        all.addAll(pending);
+        all.addAll(retryable);
+        exchange.getIn().setBody(all.isEmpty() ? List.of() : all);
     }
 
     private void publishOne(Exchange exchange) {
@@ -51,15 +69,25 @@ public class OutboxRelayRoute extends RouteBuilder {
                 .createdAt(event.getCreatedAt()).publishedAt(java.time.Instant.now())
                 .status(OutboxStatus.PUBLISHED).retryCount(event.getRetryCount()).build());
         } catch (Exception e) {
-            log.error("Failed to relay outbox event {}: {}", event.getId(), e.getMessage(), e);
+            int newRetryCount = event.getRetryCount() + 1;
+            log.error("Failed to relay outbox event {} (attempt {}/{}): {}",
+                event.getId(), newRetryCount, MAX_RETRIES, e.getMessage(), e);
             outboxRepository.save(OutboxEvent.builder()
                 .id(event.getId()).aggregateType(event.getAggregateType())
                 .aggregateId(event.getAggregateId()).eventType(event.getEventType())
                 .payload(event.getPayload()).topic(event.getTopic())
                 .partitionKey(event.getPartitionKey()).headers(event.getHeaders())
                 .createdAt(event.getCreatedAt()).publishedAt(event.getPublishedAt())
-                .status(OutboxStatus.FAILED).retryCount(event.getRetryCount() + 1)
+                .status(OutboxStatus.FAILED).retryCount(newRetryCount)
                 .errorMessage(e.getMessage()).build());
+            if (newRetryCount >= MAX_RETRIES) {
+                // I5 fix: surface permanently-failed events with a distinct
+                // ERROR log so operators can spot them in log-aggregation tools.
+                // OutboxStatus has no DEAD state, so FAILED + retryCount >= MAX
+                // is the operational signal that manual intervention is required.
+                log.error("Outbox event {} exceeded max retries ({}); manual intervention required",
+                    event.getId(), MAX_RETRIES);
+            }
         }
     }
 }

@@ -1,5 +1,7 @@
 package com.wpanther.transcript.orchestrator.infrastructure.adapter.in.messaging;
 
+import static org.apache.camel.builder.Builder.simple;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wpanther.transcript.orchestrator.application.dto.event.*;
 import com.wpanther.transcript.orchestrator.application.usecase.*;
@@ -22,6 +24,9 @@ public class ApprovalConsumerRoute extends RouteBuilder {
     @Override public void configure() {
         onException(Exception.class).handled(true)
             .log(LoggingLevel.ERROR, "Approval error: ${exception.message}")
+            // I3 fix: pass through the original Kafka message key so DLQ
+            // consumers can correlate failures back to the batch / aggregate.
+            .setHeader("kafka.KEY", simple("${headers[kafka.KEY]}"))
             .to("kafka:" + topics.getDlq() + opts());
 
         from(url(topics.getApprovalRegistrar(), groupId + "-registrar"))

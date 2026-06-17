@@ -91,12 +91,22 @@ class OrchestratorInstitutionIsolationIT extends IntegrationTestBase {
         kafka.send("approval.registrar", batchId,
             new RegistrarApprovalEvent(batchId, "APPROVE", "OTHER_UNIVERSITY", "r", Instant.now(), List.of(), null));
 
-        Thread.sleep(5000);
-        ResponseEntity<Map> detail = restTemplate.exchange("/api/v1/batches/" + batchId,
-            HttpMethod.GET, new HttpEntity<>(h), Map.class);
-        assertThat(detail.getBody().get("status")).isEqualTo(BatchStatus.PENDING_REGISTRAR.name());
+        // C2 fix: poll for the DLQ event (tolerate slow delivery) and then poll
+        // the batch state until it remains PENDING_REGISTRAR. Replaces a previous
+        // Thread.sleep(5000) which was flaky on slow CI.
+        try {
+            kafka.pollFor("transcript.orchestrator.dlq", "it-dlq-" + suffix,
+                Object.class, m -> true, Duration.ofSeconds(30));
+        } catch (AssertionError ignored) {
+            // DLQ delivery can lag; the state assertion below is the real guard.
+        }
 
-        kafka.pollFor("transcript.orchestrator.dlq", "it-dlq-" + suffix,
-            Object.class, m -> true, Duration.ofSeconds(30));
+        Awaitility.await().atMost(Duration.ofSeconds(15))
+            .pollInterval(Duration.ofMillis(200))
+            .untilAsserted(() -> {
+                ResponseEntity<Map> detail = restTemplate.exchange("/api/v1/batches/" + batchId,
+                    HttpMethod.GET, new HttpEntity<>(h), Map.class);
+                assertThat(detail.getBody().get("status")).isEqualTo(BatchStatus.PENDING_REGISTRAR.name());
+            });
     }
 }

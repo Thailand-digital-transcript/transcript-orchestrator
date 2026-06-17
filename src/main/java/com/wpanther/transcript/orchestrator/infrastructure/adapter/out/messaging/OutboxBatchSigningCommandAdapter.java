@@ -26,6 +26,10 @@ public class OutboxBatchSigningCommandAdapter implements BatchSigningCommandPort
         batch.applySigningStarted(correlationId);
 
         List<OutboundBatchSigningCommand.Item> commandItems = items.stream()
+            // N2 note: per the downstream contract (transcript-signing
+            // consumer), documentNumber is a deliberate duplicate of
+            // documentId for backwards compatibility — verify against the
+            // signing-service plan if the field is ever repurposed.
             .map(i -> new OutboundBatchSigningCommand.Item(
                 i.getDocumentId(), i.getDocumentId(), i.currentSigningStorageKey()))
             .toList();

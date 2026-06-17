@@ -17,24 +17,27 @@ import java.lang.reflect.Field;
 class BatchEntityMapper {
 
     static void restore(Batch batch, BatchEntity e) {
-        // M2 fix: override the random UUID set by Batch.create() with the stored id.
-        set(batch, "id", e.getId());
-        set(batch, "version", e.getVersion());
-        set(batch, "itemCount", e.getItemCount());
-        set(batch, "status", e.getStatus());
-        set(batch, "awaitingReplyFor", e.getAwaitingReplyFor());
-        set(batch, "closedBy", e.getClosedBy());
-        set(batch, "closedAt", e.getClosedAt());
-        set(batch, "registrarApprovedBy", e.getRegistrarApprovedBy());
-        set(batch, "registrarApprovedAt", e.getRegistrarApprovedAt());
-        set(batch, "deanApprovedBy", e.getDeanApprovedBy());
-        set(batch, "deanApprovedAt", e.getDeanApprovedAt());
-        set(batch, "rejectedBy", e.getRejectedBy());
-        set(batch, "rejectedAt", e.getRejectedAt());
-        set(batch, "rejectionReason", e.getRejectionReason());
-        set(batch, "failureReason", e.getFailureReason());
-        set(batch, "createdAt", e.getCreatedAt());
-        set(batch, "completedAt", e.getCompletedAt());
+        // I1 fix: required fields throw on null (catches data-migration / bad-row
+        // corruption); optional fields are skipped when null so the domain object
+        // retains its create()-time defaults.
+        setRequired(batch, "id", e.getId(), "BatchEntity.id");
+        setRequired(batch, "version", e.getVersion(), "BatchEntity.version");
+        setRequired(batch, "itemCount", e.getItemCount(), "BatchEntity.itemCount");
+        setRequired(batch, "status", e.getStatus(), "BatchEntity.status");
+        setRequired(batch, "createdAt", e.getCreatedAt(), "BatchEntity.createdAt");
+
+        setIfNotNull(batch, "awaitingReplyFor", e.getAwaitingReplyFor());
+        setIfNotNull(batch, "closedBy", e.getClosedBy());
+        setIfNotNull(batch, "closedAt", e.getClosedAt());
+        setIfNotNull(batch, "registrarApprovedBy", e.getRegistrarApprovedBy());
+        setIfNotNull(batch, "registrarApprovedAt", e.getRegistrarApprovedAt());
+        setIfNotNull(batch, "deanApprovedBy", e.getDeanApprovedBy());
+        setIfNotNull(batch, "deanApprovedAt", e.getDeanApprovedAt());
+        setIfNotNull(batch, "rejectedBy", e.getRejectedBy());
+        setIfNotNull(batch, "rejectedAt", e.getRejectedAt());
+        setIfNotNull(batch, "rejectionReason", e.getRejectionReason());
+        setIfNotNull(batch, "failureReason", e.getFailureReason());
+        setIfNotNull(batch, "completedAt", e.getCompletedAt());
     }
 
     private static void set(Object target, String field, Object value) {
@@ -45,5 +48,16 @@ class BatchEntityMapper {
         } catch (Exception ex) {
             throw new IllegalStateException("Cannot restore field " + field, ex);
         }
+    }
+
+    private static void setRequired(Object target, String field, Object value, String columnLabel) {
+        if (value == null) {
+            throw new IllegalStateException(columnLabel + " is null but required for Batch restore");
+        }
+        set(target, field, value);
+    }
+
+    private static void setIfNotNull(Object target, String field, Object value) {
+        if (value != null) set(target, field, value);
     }
 }

@@ -44,6 +44,11 @@ public class HandleDeanApprovalUseCase {
 
         List<TranscriptItem> items = itemRepository.findByBatchIdAndStatusIn(batchId,
             List.of(ItemStatus.REGISTRAR_SIGNED));
+        // I4 note: applyItemRejections only sees REGISTRAR_SIGNED items (the ones this
+        // gate acts on). Items already in REJECTED/FAILED from the registrar gate are
+        // not in this list. The "all rejected → cancel" decision therefore reflects
+        // only the registrar-signed subset. If a future change widens the gate's
+        // responsibility, switch to a full-roster query here.
         boolean cancelled = stateMachine.applyItemRejections(batch, items,
             event.getRejectedDocumentIds(), event.getApprovedBy(), event.getApprovedAt(),
             "Rejected by dean");

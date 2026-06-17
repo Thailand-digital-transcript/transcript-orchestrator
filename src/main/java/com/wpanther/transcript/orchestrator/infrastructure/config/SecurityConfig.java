@@ -35,6 +35,11 @@ public class SecurityConfig {
         http.csrf(AbstractHttpConfigurer::disable)
             .addFilterBefore(new ApiKeyFilter(keys), UsernamePasswordAuthenticationFilter.class)
             .authorizeHttpRequests(a -> a
+                // N4 note: /actuator/** is also short-circuited inside
+                // ApiKeyFilter below. Both are intentional: this permitAll()
+                // lets Spring Security skip auth checks, the short-circuit
+                // avoids the X-API-Key check for scrape-friendly endpoints
+                // like /actuator/prometheus.
                 .requestMatchers("/actuator/**").permitAll()
                 .anyRequest().authenticated());
         return http.build();

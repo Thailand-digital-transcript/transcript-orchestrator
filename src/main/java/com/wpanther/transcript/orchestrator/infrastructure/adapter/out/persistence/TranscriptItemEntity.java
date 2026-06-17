@@ -7,6 +7,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
@@ -44,6 +46,17 @@ public class TranscriptItemEntity {
 
     @Column(nullable = false)
     private Instant updatedAt;
+
+    /**
+     * N5 fix: keep updated_at in sync with each persist/update so item-level
+     * staleness queries (and any future stuck-item sweeper) can rely on it.
+     * Mirrors the equivalent touch() on {@link BatchEntity}.
+     */
+    @PrePersist
+    @PreUpdate
+    void touch() {
+        updatedAt = Instant.now();
+    }
 
     public static TranscriptItemEntity fromDomain(TranscriptItem i) {
         TranscriptItemEntity e = new TranscriptItemEntity();

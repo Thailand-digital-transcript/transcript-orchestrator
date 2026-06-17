@@ -43,6 +43,8 @@ public class BatchController {
     private final AssignItemsUseCase assignItemsUseCase;
     private final UnassignItemUseCase unassignItemUseCase;
     private final CloseBatchUseCase closeBatchUseCase;
+    // N3 note: query endpoints deliberately bypass the use case layer — reads
+    // don't orchestrate domain logic, only project the aggregate for the API.
     private final BatchRepository batchRepository;
     private final TranscriptItemRepository itemRepository;
 
