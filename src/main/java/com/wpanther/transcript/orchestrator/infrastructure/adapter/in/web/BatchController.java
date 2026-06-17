@@ -2,6 +2,9 @@ package com.wpanther.transcript.orchestrator.infrastructure.adapter.in.web;
 
 import com.wpanther.transcript.orchestrator.application.dto.command.AssignItemsCommand;
 import com.wpanther.transcript.orchestrator.application.dto.command.CreateBatchCommand;
+import com.wpanther.transcript.orchestrator.application.dto.query.BatchDetail;
+import com.wpanther.transcript.orchestrator.application.dto.query.BatchSummary;
+import com.wpanther.transcript.orchestrator.application.dto.query.TranscriptItemSummary;
 import com.wpanther.transcript.orchestrator.application.usecase.AssignItemsUseCase;
 import com.wpanther.transcript.orchestrator.application.usecase.CloseBatchUseCase;
 import com.wpanther.transcript.orchestrator.application.usecase.CreateBatchUseCase;
@@ -11,18 +14,24 @@ import com.wpanther.transcript.orchestrator.domain.exception.EmptyBatchException
 import com.wpanther.transcript.orchestrator.domain.exception.InstitutionMismatchException;
 import com.wpanther.transcript.orchestrator.domain.exception.InvalidBatchStateException;
 import com.wpanther.transcript.orchestrator.domain.model.Batch;
+import com.wpanther.transcript.orchestrator.domain.model.BatchStatus;
+import com.wpanther.transcript.orchestrator.domain.repository.BatchRepository;
+import com.wpanther.transcript.orchestrator.domain.repository.TranscriptItemRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -34,6 +43,8 @@ public class BatchController {
     private final AssignItemsUseCase assignItemsUseCase;
     private final UnassignItemUseCase unassignItemUseCase;
     private final CloseBatchUseCase closeBatchUseCase;
+    private final BatchRepository batchRepository;
+    private final TranscriptItemRepository itemRepository;
 
     @PostMapping
     public ResponseEntity<Map<String, Object>> create(@Valid @RequestBody CreateBatchCommand cmd) {
@@ -60,6 +71,23 @@ public class BatchController {
             @RequestHeader(value = "X-Closed-By", defaultValue = "system") String closedBy) {
         Batch b = closeBatchUseCase.close(id, closedBy);
         return ResponseEntity.ok(Map.of("batchId", b.getId(), "status", b.getStatus()));
+    }
+
+    @GetMapping
+    public ResponseEntity<List<BatchSummary>> list(@RequestParam(required = false) String status) {
+        List<BatchStatus> statuses = status != null
+            ? List.of(BatchStatus.valueOf(status)) : List.of(BatchStatus.values());
+        return ResponseEntity.ok(
+            batchRepository.findByStatusIn(statuses, 100).stream().map(BatchSummary::from).toList());
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<BatchDetail> getDetail(@PathVariable UUID id) {
+        Batch batch = batchRepository.findById(id)
+            .orElseThrow(() -> new BatchNotFoundException(id.toString()));
+        List<TranscriptItemSummary> items = itemRepository.findByBatchId(id).stream()
+            .map(TranscriptItemSummary::from).toList();
+        return ResponseEntity.ok(BatchDetail.from(batch, items));
     }
 
     @ExceptionHandler(BatchNotFoundException.class)
