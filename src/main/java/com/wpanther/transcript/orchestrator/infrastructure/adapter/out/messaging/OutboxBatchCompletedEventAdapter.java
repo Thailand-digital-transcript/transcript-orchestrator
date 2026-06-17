@@ -1,6 +1,6 @@
 package com.wpanther.transcript.orchestrator.infrastructure.adapter.out.messaging;
 
-import com.wpanther.saga.infrastructure.outbox.OutboxService;
+import com.wpanther.transcript.saga.infrastructure.outbox.OutboxService;
 import com.wpanther.transcript.orchestrator.application.port.out.BatchCompletedEventPort;
 import com.wpanther.transcript.orchestrator.domain.model.Batch;
 import com.wpanther.transcript.orchestrator.infrastructure.adapter.out.messaging.dto.BatchCompletedEvent;

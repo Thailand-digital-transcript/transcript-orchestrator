@@ -1,6 +1,6 @@
 package com.wpanther.transcript.orchestrator.infrastructure.adapter.in.messaging;
 
-import com.wpanther.saga.domain.outbox.*;
+import com.wpanther.transcript.saga.domain.outbox.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.camel.Exchange;

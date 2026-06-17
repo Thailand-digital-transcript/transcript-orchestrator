@@ -1,7 +1,7 @@
 package com.wpanther.transcript.orchestrator.infrastructure.adapter.out.messaging.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.wpanther.saga.domain.model.TraceEvent;
+import com.wpanther.transcript.saga.domain.model.TraceEvent;
 import java.time.Instant;
 
 public class BatchCompletedEvent extends TraceEvent {

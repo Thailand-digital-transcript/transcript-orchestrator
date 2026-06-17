@@ -1,8 +1,8 @@
 package com.wpanther.transcript.orchestrator.infrastructure.adapter.out.messaging.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.wpanther.saga.domain.enums.SagaStep;
-import com.wpanther.saga.domain.model.SagaCommand;
+import com.wpanther.transcript.saga.domain.enums.SagaStep;
+import com.wpanther.transcript.saga.domain.model.SagaCommand;
 import com.wpanther.transcript.orchestrator.domain.model.SignerRole;
 import com.wpanther.transcript.orchestrator.domain.model.SigningFormat;
 import java.util.List;
