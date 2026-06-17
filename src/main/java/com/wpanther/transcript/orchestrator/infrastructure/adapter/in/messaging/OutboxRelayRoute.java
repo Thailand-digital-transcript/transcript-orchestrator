@@ -45,6 +45,25 @@ public class OutboxRelayRoute extends RouteBuilder {
         List<OutboxEvent> retryable = failed.stream()
             .filter(e -> e.getRetryCount() < MAX_RETRIES)
             .toList();
+
+        // Flip each retryable event to PENDING so monitoring sees it as in-flight,
+        // not as "permanently failed". Preserve the previous error in errorMessage
+        // with a RETRYING prefix. The next tick's findPendingEvents will pick it
+        // up via the normal path; findFailedEvents will no longer see it.
+        for (OutboxEvent e : retryable) {
+            String prevError = e.getErrorMessage() != null ? e.getErrorMessage() : "unknown";
+            outboxRepository.save(OutboxEvent.builder()
+                .id(e.getId()).aggregateType(e.getAggregateType())
+                .aggregateId(e.getAggregateId()).eventType(e.getEventType())
+                .payload(e.getPayload()).topic(e.getTopic())
+                .partitionKey(e.getPartitionKey()).headers(e.getHeaders())
+                .createdAt(e.getCreatedAt()).publishedAt(e.getPublishedAt())
+                .status(OutboxStatus.PENDING)
+                .retryCount(e.getRetryCount())
+                .errorMessage("RETRYING attempt " + (e.getRetryCount() + 1) + " (previous error: " + prevError + ")")
+                .build());
+        }
+
         List<OutboxEvent> all = new ArrayList<>(pending.size() + retryable.size());
         all.addAll(pending);
         all.addAll(retryable);
