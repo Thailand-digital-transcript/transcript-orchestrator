@@ -46,10 +46,11 @@ public class OutboxRelayRoute extends RouteBuilder {
             .filter(e -> e.getRetryCount() < MAX_RETRIES)
             .toList();
 
-        // Flip each retryable event to PENDING so monitoring sees it as in-flight,
-        // not as "permanently failed". Preserve the previous error in errorMessage
-        // with a RETRYING prefix. The next tick's findPendingEvents will pick it
-        // up via the normal path; findFailedEvents will no longer see it.
+        // Flip each retryable event back to PENDING so monitoring sees it as in-flight.
+        // Preserve the previous error in errorMessage with a RETRYING prefix.
+        // These events are intentionally NOT added to `all` — the next tick's
+        // findPendingEvents will pick them up via the normal path, giving monitoring
+        // a durable PENDING window for the duration of the delivery attempt.
         for (OutboxEvent e : retryable) {
             String prevError = e.getErrorMessage() != null ? e.getErrorMessage() : "unknown";
             outboxRepository.save(OutboxEvent.builder()
@@ -64,10 +65,9 @@ public class OutboxRelayRoute extends RouteBuilder {
                 .build());
         }
 
-        List<OutboxEvent> all = new ArrayList<>(pending.size() + retryable.size());
-        all.addAll(pending);
-        all.addAll(retryable);
-        exchange.getIn().setBody(all.isEmpty() ? List.of() : all);
+        // Only dispatch pending events this tick; retryable events were flipped to
+        // PENDING above and will be delivered on the next timer firing.
+        exchange.getIn().setBody(pending.isEmpty() ? List.of() : new ArrayList<>(pending));
     }
 
     private void publishOne(Exchange exchange) {
