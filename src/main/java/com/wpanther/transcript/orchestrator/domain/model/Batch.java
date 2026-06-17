@@ -105,6 +105,7 @@ public class Batch {
     void setItemCount(int n)           { this.itemCount = n; }
     void setStatus(BatchStatus s)      { this.status = s; }
     void setAwaitingReplyFor(String c) { this.awaitingReplyFor = c; }
+    void setVersion(Long version)     { this.version = version; }
 
     // --- getters ---
     public UUID getId()                     { return id; }
