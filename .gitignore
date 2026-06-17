@@ -1,0 +1,25 @@
+# transcript-orchestrator gitignore
+# IDE
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.classpath
+.project
+.factorypath
+.settings/
+target/
+*.class
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+*.log
+logs/
+
+# Claude Code / Droid
+.claude/
+CLAUDE.md
+docs/superpowers/
