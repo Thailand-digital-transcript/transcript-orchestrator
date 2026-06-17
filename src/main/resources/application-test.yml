@@ -1,0 +1,12 @@
+eureka:
+  client:
+    enabled: false
+    register-with-eureka: false
+    fetch-registry: false
+
+app:
+  outbox:
+    relay:
+      enabled: true
+  security:
+    api-keys: test-key

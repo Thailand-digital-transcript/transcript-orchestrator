@@ -1,0 +1,106 @@
+server:
+  port: 8095
+
+spring:
+  application:
+    name: transcript-orchestrator
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:transcript_orchestrator_db}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+    validate-on-migrate: true
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+camel:
+  springboot:
+    name: transcript-orchestrator-camel
+    main-run-controller: true
+  component:
+    kafka:
+      brokers: ${KAFKA_BROKERS:localhost:9092}
+
+app:
+  outbox:
+    relay:
+      enabled: ${OUTBOX_RELAY_ENABLED:true}
+  kafka:
+    consumer:
+      start-saga-group-id:  ${KAFKA_START_SAGA_GROUP:transcript-orchestrator-start-saga}
+      approval-group-id:    ${KAFKA_APPROVAL_GROUP:transcript-orchestrator-approval}
+      reply-group-id:       ${KAFKA_REPLY_GROUP:transcript-orchestrator-reply}
+    topics:
+      start-saga:             saga.commands.orchestrator
+      approval-registrar:     approval.registrar
+      approval-dean:          approval.dean
+      signing-reply:          saga.reply.transcript-signing
+      pdf-generation-reply:   saga.reply.transcript-pdf-generation
+      batch-signing-command:  saga.command.transcript-signing.batch
+      pdf-generation-command: saga.command.transcript-pdf-generation
+      batch-completed:        transcript.batch.completed
+      dlq:                    transcript.orchestrator.dlq
+  storage:
+    endpoint:              ${S3_ENDPOINT:http://localhost:9000}
+    access-key:            ${S3_ACCESS_KEY:minioadmin}
+    secret-key:            ${S3_SECRET_KEY:minioadmin}
+    region:                ${S3_REGION:us-east-1}
+    xml-bucket:            ${S3_XML_BUCKET:transcript-xmls}
+    path-style-access:     true
+    presign-duration-minutes: ${S3_PRESIGN_MINUTES:60}
+  orchestrator:
+    stuck-phase-timeout-minutes: ${STUCK_PHASE_TIMEOUT_MINUTES:10}
+    sweeper-interval-ms:         ${SWEEPER_INTERVAL_MS:60000}
+  security:
+    api-keys: ${ORCHESTRATOR_API_KEYS:dev-key}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${random.value}
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+logging:
+  level:
+    root: INFO
+    com.wpanther.transcript.orchestrator: DEBUG
+    org.apache.camel: INFO
+    org.hibernate.SQL: DEBUG
