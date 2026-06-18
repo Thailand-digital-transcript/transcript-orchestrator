@@ -63,7 +63,10 @@ public class HandlePdfGenerationReplyUseCase {
             successByDocId, errorByDocId);
 
         itemRepository.saveAll(items);
-        batchRepository.save(batch);
+        // Reuse the returned domain object: saveAndFlush bumped the @Version and
+        // the dispatch below mutates + saves the batch again. Saving the
+        // stale-version object a second time would fail optimistic locking.
+        batch = batchRepository.save(batch);
 
         if (batch.getStatus() == BatchStatus.PDF_SIGNING) {
             List<TranscriptItem> healthy = itemRepository.findByBatchIdAndStatusIn(

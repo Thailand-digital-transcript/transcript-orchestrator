@@ -67,7 +67,10 @@ public class HandleSigningReplyUseCase {
         stateMachine.signingReply(batch, items, reply.getCorrelationId(), successByDocId, errorByDocId);
 
         itemRepository.saveAll(items);
-        batchRepository.save(batch);
+        // Reuse the returned domain object: saveAndFlush bumped the @Version and
+        // dispatchNextPhase may mutate + save the batch again. Passing the
+        // stale-version object on would fail optimistic locking.
+        batch = batchRepository.save(batch);
 
         dispatchNextPhase(batch, beforeStatus, items);
     }

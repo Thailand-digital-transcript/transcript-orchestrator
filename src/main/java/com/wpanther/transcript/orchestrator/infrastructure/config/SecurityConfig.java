@@ -10,13 +10,17 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -63,6 +67,12 @@ public class SecurityConfig {
                 ((HttpServletResponse) res).sendError(401);
                 return;
             }
+            // A valid key authenticates the caller. Without this the request
+            // continues as anonymous and `anyRequest().authenticated()` rejects
+            // it with 403, so every valid-key request would otherwise fail.
+            SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                    "api-key", null, List.of(new SimpleGrantedAuthority("ROLE_API"))));
             chain.doFilter(req, res);
         }
     }

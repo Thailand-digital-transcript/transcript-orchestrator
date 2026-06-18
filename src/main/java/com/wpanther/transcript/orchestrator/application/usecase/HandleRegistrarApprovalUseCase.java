@@ -46,7 +46,10 @@ public class HandleRegistrarApprovalUseCase {
             "Rejected by registrar");
 
         itemRepository.saveAll(items);
-        batchRepository.save(batch);
+        // Reuse the returned domain object: saveAndFlush bumped the @Version, and
+        // the dispatch below mutates the batch again. Saving the stale-version
+        // object a second time would fail optimistic locking.
+        batch = batchRepository.save(batch);
 
         if (!cancelled) {
             List<TranscriptItem> healthy = items.stream().filter(TranscriptItem::isHealthy).toList();
