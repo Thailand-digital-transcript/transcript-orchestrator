@@ -21,6 +21,7 @@ class HandleRegistrarApprovalUseCaseTest {
     @Mock TranscriptItemRepository itemRepository;
     @Mock BatchStateMachine stateMachine;
     @Mock BatchSigningCommandPort signingCommandPort;
+    @Mock PendingDecisionRepository pendingDecisionRepository;
     @InjectMocks HandleRegistrarApprovalUseCase useCase;
 
     @Test void approve_validBatch_dispatches() {

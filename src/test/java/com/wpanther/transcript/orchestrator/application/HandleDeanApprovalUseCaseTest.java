@@ -19,6 +19,7 @@ class HandleDeanApprovalUseCaseTest {
     @Mock TranscriptItemRepository itemRepository;
     @Mock BatchStateMachine stateMachine;
     @Mock BatchSigningCommandPort signingCommandPort;
+    @Mock PendingDecisionRepository pendingDecisionRepository;
     @InjectMocks HandleDeanApprovalUseCase useCase;
 
     @Test void approve_pendingDean_dispatchesDeanCommand() {
