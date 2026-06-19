@@ -50,7 +50,7 @@ class OrchestratorIdempotencyIT extends IntegrationTestBase {
 
         Awaitility.await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {
             HttpHeaders h = new HttpHeaders();
-            h.set("X-API-Key", "test-key");
+            h.setBearerAuth(bearerToken());
             ResponseEntity<Map[]> r = restTemplate.exchange("/api/v1/transcripts",
                 HttpMethod.GET, new HttpEntity<>(h), Map[].class);
             long count = Arrays.stream(r.getBody())

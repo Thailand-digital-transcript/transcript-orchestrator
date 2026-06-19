@@ -11,16 +11,11 @@ import java.util.Optional;
 
 /**
  * Helper for reading the current caller's identity from
- * {@link SecurityContextHolder}. Handles both authentication modes registered
- * by {@link SecurityConfig}:
+ * {@link SecurityContextHolder}. Handles the single authentication mode
+ * registered by {@link SecurityConfig}:
  *
  * <ul>
- *   <li>API-key callers — principal name {@code "api-key"} (no JWT, no scope).
- *       {@link #isApiKey()} returns true, {@link #institutionCode()} is empty.</li>
- *   <li>JWT (Keycloak) callers — a {@link JwtAuthenticationToken} carrying a
- *       {@link Jwt} with {@code preferred_username}, {@code institution_code},
- *       and {@code realm_access.roles} claims mapped to {@code ROLE_<UPPER>}
- *       authorities by {@code SecurityConfig#jwtConverter()}.</li>
+ *   <li>JWT (Keycloak) callers — the only supported principal. A token without an {@code institution_code} claim reads unscoped.</li>
  * </ul>
  *
  * <p>Decision endpoints (Phase B) use {@link #gateFromRoles()} to map the
@@ -28,12 +23,6 @@ import java.util.Optional;
  */
 @Component
 public class CallerContext {
-
-    /** True for {@code api-key} principals registered by {@code ApiKeyFilter}. */
-    public boolean isApiKey() {
-        Authentication a = SecurityContextHolder.getContext().getAuthentication();
-        return a != null && "api-key".equals(a.getName());
-    }
 
     /** Caller username — {@code preferred_username} (JWT) or principal name. */
     public String username() {
@@ -47,8 +36,8 @@ public class CallerContext {
     }
 
     /**
-     * Institution code from the {@code institution_code} JWT claim. Empty for
-     * API-key callers (unscoped).
+     * Institution code from the {@code institution_code} JWT claim. Empty
+     * when the token carries no {@code institution_code} claim (unscoped read).
      */
     public Optional<String> institutionCode() {
         Authentication a = SecurityContextHolder.getContext().getAuthentication();
@@ -62,8 +51,8 @@ public class CallerContext {
     /**
      * Map the caller's realm role to the human-gate batch status they may
      * advance: {@code REGISTRAR} → {@code PENDING_REGISTRAR},
-     * {@code DEAN} → {@code PENDING_DEAN}. Empty for API-key callers or
-     * roles that are not human-gate owners.
+     * {@code DEAN} → {@code PENDING_DEAN}. Empty when the caller has no
+     * human-gate role.
      *
      * <p>Limitation: a caller holding BOTH roles resolves to the REGISTRAR gate
      * (checked first); they cannot act on the dean gate through this single-gate

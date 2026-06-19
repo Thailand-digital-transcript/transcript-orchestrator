@@ -8,5 +8,9 @@ app:
   outbox:
     relay:
       enabled: true
-  security:
-    api-keys: test-key
+
+keycloak:
+  # The test JwtDecoder (TestJwtConfig) validates iss against this; jwks-uri is
+  # unused in tests (the test decoder trusts a local keypair) but set for parity.
+  issuer: http://localhost:8080/realms/transcript
+  jwks-uri: http://localhost:8080/realms/transcript/protocol/openid-connect/certs

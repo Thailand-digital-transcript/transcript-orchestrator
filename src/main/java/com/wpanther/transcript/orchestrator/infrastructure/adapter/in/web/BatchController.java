@@ -92,8 +92,9 @@ public class BatchController {
      * </ul>
      *
      * <p>JWT callers (with an {@code institution_code} claim) are scoped to
-     * their institution; API-key callers see the unscoped read (the existing
-     * service-side behaviour, retained for backward compatibility).
+     * their institution; callers without an institution claim see the unscoped
+     * read (the existing service-side behaviour, retained for the monitor
+     * consumer).
      */
     @GetMapping
     public ResponseEntity<List<BatchSummary>> list(
@@ -108,10 +109,11 @@ public class BatchController {
             int p = page == null ? 0 : Math.max(page, 0);
             int s = size == null ? 20 : Math.max(size, 1);
             if (institution.isEmpty() && p > 0) {
-                // Unscoped (API-key) callers have no real paginated query — only a
-                // capped first-page read exists. Rejecting page>0 avoids silently
-                // returning page 0 for every page (which looks like working
-                // pagination but isn't). Production monitor callers are JWT-scoped.
+                // Unscoped callers (no institution_code claim) have no real
+                // paginated query — only a capped first-page read exists.
+                // Rejecting page>0 avoids silently returning page 0 for every
+                // page (which looks like working pagination but isn't).
+                // Production monitor callers are JWT-scoped.
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Pagination beyond page 0 requires institution-scoped (JWT) authentication");
             }
@@ -143,8 +145,8 @@ public class BatchController {
         Batch batch = batchRepository.findById(id)
             .orElseThrow(() -> new BatchNotFoundException(id.toString()));
         // Cross-institution JWT callers get a 404 (BatchNotFoundException, mapped
-        // below) so the detail cannot leak across institutions. API-key callers
-        // (no institution_code) and JWT callers in the matching institution
+        // below) so the detail cannot leak across institutions. Callers without
+        // an institution_code claim and JWT callers in the matching institution
         // proceed. Privacy: spec §4.4 — 404 over 403 to avoid confirming existence.
         if (caller.institutionCode().filter(c -> !c.equals(batch.getInstitutionCode())).isPresent()) {
             throw new BatchNotFoundException(id.toString());

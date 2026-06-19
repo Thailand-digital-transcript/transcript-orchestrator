@@ -111,13 +111,13 @@ class OrchestratorRejectionIT extends IntegrationTestBase {
 
     private <T> ResponseEntity<T> get(String path, Class<T> type) {
         HttpHeaders h = new HttpHeaders();
-        h.set("X-API-Key", "test-key");
+        h.setBearerAuth(bearerToken());
         return restTemplate.exchange(path, HttpMethod.GET, new HttpEntity<>(h), type);
     }
 
-    private <T> HttpEntity<T> withKey(T body) {
+    private <T> HttpEntity<T> withBearer(T body) {
         HttpHeaders h = new HttpHeaders();
-        h.set("X-API-Key", "test-key");
+        h.setBearerAuth(bearerToken());
         h.setContentType(MediaType.APPLICATION_JSON);
         return new HttpEntity<>(body, h);
     }
@@ -140,7 +140,7 @@ class OrchestratorRejectionIT extends IntegrationTestBase {
         cmd.setName(name);
         cmd.setInstitutionCode(inst);
         cmd.setCreatedBy("test");
-        return restTemplate.exchange("/api/v1/batches", HttpMethod.POST, withKey(cmd), Map.class)
+        return restTemplate.exchange("/api/v1/batches", HttpMethod.POST, withBearer(cmd), Map.class)
             .getBody().get("batchId").toString();
     }
 
@@ -148,12 +148,12 @@ class OrchestratorRejectionIT extends IntegrationTestBase {
         AssignItemsCommand cmd = new AssignItemsCommand();
         cmd.setItemIds(ids.stream().map(UUID::fromString).toList());
         restTemplate.exchange("/api/v1/batches/" + batchId + "/items",
-            HttpMethod.POST, withKey(cmd), Void.class);
+            HttpMethod.POST, withBearer(cmd), Void.class);
     }
 
     private void closeBatch(String batchId) {
         HttpHeaders h = new HttpHeaders();
-        h.set("X-API-Key", "test-key");
+        h.setBearerAuth(bearerToken());
         h.set("X-Closed-By", "test");
         restTemplate.exchange("/api/v1/batches/" + batchId + "/close",
             HttpMethod.POST, new HttpEntity<>(h), Map.class);

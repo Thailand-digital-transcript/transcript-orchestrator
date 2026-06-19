@@ -14,28 +14,22 @@ import java.util.stream.Collectors;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Focused unit test of {@link SecurityConfig#jwtConverter()} (fix I2).
+ * Focused unit test of {@link SecurityConfig#jwtConverter()}'s
+ * {@code realm_access.roles} → {@code ROLE_<UPPER>} mapping.
  *
- * <p>The integration-test profile does NOT set {@code KEYCLOAK_ISSUER_URI}, so
- * only the API-key {@code SecurityFilterChain} ({@code apiKeyChain}) registers
- * and the {@code oauth2ResourceServer().jwt()} bearer filter — which is where
- * this converter actually runs — never executes during the IT suite. The
- * existing {@code DecisionEndpointIT} and {@code DualAuthIT} inject a
- * pre-built {@code JwtAuthenticationToken} via
- * {@code SecurityMockMvcRequestPostProcessors.authentication(...)}, which
- * bypasses the bearer filter AND this converter. A bug in the converter (wrong
- * claim path, wrong {@code ROLE_} prefix, {@code realm_access} shape
- * mismatch) or in {@code IssuerConfiguredCondition} would therefore go
- * undetected.
- *
- * <p>This test constructs {@link Jwt} instances directly and runs them through
- * the real {@link JwtAuthenticationConverter} returned by
+ * <p>Constructs {@link Jwt} instances directly and runs them through the real
+ * {@link JwtAuthenticationConverter} returned by
  * {@link SecurityConfig#jwtConverter()}, pinning:
  * <ul>
  *   <li>{@code realm_access.roles = ["registrar"]} → exactly {@code ROLE_REGISTRAR}.</li>
  *   <li>{@code realm_access.roles = ["dean"]} → exactly {@code ROLE_DEAN}.</li>
  *   <li>a roles-less Jwt (no {@code realm_access} claim) → no {@code ROLE_} authorities.</li>
  * </ul>
+ *
+ * <p>The live-token path (live bearer → resource-server filter → converter)
+ * is exercised end-to-end by {@code AuthIT}; this unit test isolates the
+ * converter's claim → authority mapping so a regression there fails fast
+ * even when the IT container stack is unavailable.
  *
  * <p>{@link SecurityConfig#jwtConverter()} is package-private; this test lives
  * in the same package so it can invoke the real converter without reflection.

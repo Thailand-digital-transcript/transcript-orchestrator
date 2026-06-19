@@ -68,9 +68,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * A11 plan review.
  *
  * <h3>Mock JWT wiring</h3>
- * Identical to {@code DecisionEndpointIT}: the test profile has no
- * {@code KEYCLOAK_ISSUER_URI}, so only the API-key chain is active. We construct
- * a real {@link JwtAuthenticationToken} carrying the {@code preferred_username},
+ * Identical to {@code DecisionEndpointIT}: the test profile substitutes a test
+ * {@link JwtDecoder} ({@code TestJwtConfig}) that trusts a local keypair, so
+ * we can sign tokens with the matching private key. We construct a real
+ * {@link JwtAuthenticationToken} carrying the {@code preferred_username},
  * {@code institution_code}, and role authorities the production JWT converter
  * would emit, and inject it via
  * {@link SecurityMockMvcRequestPostProcessors#authentication}. The chain's

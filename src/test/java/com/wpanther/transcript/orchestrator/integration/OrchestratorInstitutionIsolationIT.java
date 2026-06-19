@@ -54,7 +54,7 @@ class OrchestratorInstitutionIsolationIT extends IntegrationTestBase {
             new InboundStartSagaCommand(txId, docId, "KMUTT", "REGULAR", "xmls/" + docId + ".xml"));
 
         HttpHeaders h = new HttpHeaders();
-        h.set("X-API-Key", "test-key");
+        h.setBearerAuth(bearerToken());
         Awaitility.await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
             assertThat(restTemplate.exchange("/api/v1/transcripts",
                 HttpMethod.GET, new HttpEntity<>(h), String.class).getBody()).contains(docId));
@@ -71,7 +71,7 @@ class OrchestratorInstitutionIsolationIT extends IntegrationTestBase {
         bc.setInstitutionCode("KMUTT");
         bc.setCreatedBy("test");
         HttpHeaders jh = new HttpHeaders();
-        jh.set("X-API-Key", "test-key");
+        jh.setBearerAuth(bearerToken());
         jh.setContentType(MediaType.APPLICATION_JSON);
         String batchId = restTemplate.exchange("/api/v1/batches", HttpMethod.POST,
             new HttpEntity<>(bc, jh), Map.class).getBody().get("batchId").toString();
@@ -82,7 +82,7 @@ class OrchestratorInstitutionIsolationIT extends IntegrationTestBase {
             HttpMethod.POST, new HttpEntity<>(ac, jh), Void.class);
 
         HttpHeaders ch = new HttpHeaders();
-        ch.set("X-API-Key", "test-key");
+        ch.setBearerAuth(bearerToken());
         ch.set("X-Closed-By", "t");
         restTemplate.exchange("/api/v1/batches/" + batchId + "/close",
             HttpMethod.POST, new HttpEntity<>(ch), Map.class);
