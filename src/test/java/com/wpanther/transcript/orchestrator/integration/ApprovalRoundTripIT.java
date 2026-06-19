@@ -34,7 +34,6 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -212,29 +211,23 @@ class ApprovalRoundTripIT extends IntegrationTestBase {
      * {@code onException} handler routes any consumer failure to the DLQ with the
      * original Kafka key ({@code ${headers[kafka.KEY]}}, which is the batch id) and
      * the original event JSON as the body. We therefore scan the DLQ value for the
-     * batch id. {@link KafkaTestHelper#pollFor} throws {@link AssertionError} on
-     * timeout — exactly the success outcome here, so we assert that the throw
-     * occurred and that no matching record was observed along the way.
+     * batch id.
+     *
+     * <p>The DLQ topic is shared across the whole IT suite and may already carry
+     * unrelated messages of various shapes left by earlier tests, so we drain the
+     * RAW record values (no typed deserialisation — see
+     * {@link KafkaTestHelper#drainRawValues}, which avoids the
+     * {@code MismatchedInputException} a typed {@code pollFor(String.class)} would
+     * throw on an Object-valued payload) and assert none references THIS batch's
+     * unique id. A fresh per-test batch id guarantees earlier ITs' messages cannot
+     * collide.
      */
     private void assertNoDlqMessageForBatch(String batchId) {
-        boolean[] found = {false};
-        assertThatThrownBy(() -> kafka.pollFor(
-                DLQ_TOPIC,
-                "dlq-check-" + UUID.randomUUID(),
-                String.class,
-                msg -> {
-                    if (msg != null && msg.contains(batchId)) {
-                        found[0] = true;
-                        return true; // satisfy predicate → pollFor returns (no throw)
-                    }
-                    return false; // keep polling until timeout
-                },
-                Duration.ofSeconds(3)))
-            .as("Duplicate decisionId must not land in the DLQ")
-            .isInstanceOf(AssertionError.class);
-        assertThat(found[0])
-            .as("A DLQ message referencing batch %s was observed", batchId)
-            .isFalse();
+        List<String> dlqValues = kafka.drainRawValues(
+                DLQ_TOPIC, "dlq-check-" + UUID.randomUUID(), Duration.ofSeconds(3));
+        assertThat(dlqValues)
+                .as("Duplicate decisionId must not land in the DLQ for batch %s", batchId)
+                .noneMatch(v -> v != null && v.contains(batchId));
     }
 
     /** GET /api/v1/batches/{id} as the registrar JWT and return the detail map. */

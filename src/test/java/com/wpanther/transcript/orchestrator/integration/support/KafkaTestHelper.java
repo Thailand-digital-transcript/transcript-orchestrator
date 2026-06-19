@@ -10,6 +10,7 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
@@ -66,6 +67,29 @@ public class KafkaTestHelper {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * Drain every record value (raw String, no JSON deserialisation) observed on
+     * {@code topic} within {@code window}, reading from the earliest offset.
+     *
+     * <p>Unlike {@link #pollFor}, this performs NO typed deserialisation, so it is
+     * safe on heterogeneous topics — e.g. a DLQ shared across the whole IT suite
+     * that may carry payloads of different shapes left by earlier tests. Callers
+     * filter the returned raw values themselves (e.g. {@code v.contains(batchId)}).
+     */
+    public List<String> drainRawValues(String topic, String groupId, Duration window) {
+        List<String> values = new ArrayList<>();
+        try (KafkaConsumer<String, String> c = consumer(groupId)) {
+            c.subscribe(List.of(topic));
+            long deadline = System.currentTimeMillis() + window.toMillis();
+            while (System.currentTimeMillis() < deadline) {
+                for (var rec : c.poll(Duration.ofMillis(500))) {
+                    values.add(rec.value());
+                }
+            }
+        }
+        return values;
     }
 
     private KafkaProducer<String, String> producer() {

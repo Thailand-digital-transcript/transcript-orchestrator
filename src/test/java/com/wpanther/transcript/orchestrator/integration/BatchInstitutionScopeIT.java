@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -29,39 +30,48 @@ class BatchInstitutionScopeIT extends IntegrationTestBase {
 
     @Test
     void scopesByInstitution() {
-        // Seed two PENDING_REGISTRAR batches in "01110" and one in "02220".
-        Batch mine1 = repo.save(newPendingBatch("scope-a", "01110", "alice"));
-        Batch mine2 = repo.save(newPendingBatch("scope-b", "01110", "alice"));
-        Batch other = repo.save(newPendingBatch("scope-c", "02220", "bob"));
+        // IntegrationTestBase shares ONE Postgres across the whole IT suite, so
+        // other ITs (DecisionEndpointIT, OrchestratorHappyPathIT, ...) leave batch
+        // rows behind. Use per-run UNIQUE institution codes (VARCHAR(50) — a 42-char
+        // "SCOPE-<uuid>" fits) so the exact-match / count assertions below see only
+        // this test's seeded rows. instEmpty is never seeded → its count must be 0.
+        String instMine = "SCOPE-" + UUID.randomUUID();
+        String instOther = "SCOPE-" + UUID.randomUUID();
+        String instEmpty = "SCOPE-" + UUID.randomUUID();
+
+        // Seed two PENDING_REGISTRAR batches in instMine and one in instOther.
+        Batch mine1 = repo.save(newPendingBatch("scope-a", instMine, "alice"));
+        Batch mine2 = repo.save(newPendingBatch("scope-b", instMine, "alice"));
+        Batch other = repo.save(newPendingBatch("scope-c", instOther, "bob"));
 
         // findByStatusInAndInstitutionCode: queue read for one institution.
         List<Batch> queue = repo.findByStatusInAndInstitutionCode(
-                List.of(BatchStatus.PENDING_REGISTRAR), "01110", 100);
+                List.of(BatchStatus.PENDING_REGISTRAR), instMine, 100);
         assertThat(queue)
                 .extracting(Batch::getId)
                 .containsExactlyInAnyOrder(mine1.getId(), mine2.getId())
                 .doesNotContain(other.getId());
-        assertThat(queue).allMatch(b -> "01110".equals(b.getInstitutionCode()));
+        assertThat(queue).allMatch(b -> instMine.equals(b.getInstitutionCode()));
         assertThat(queue).allMatch(b -> b.getStatus() == BatchStatus.PENDING_REGISTRAR);
 
         // findByInstitutionCode: paginated monitor read.
-        List<Batch> page0 = repo.findByInstitutionCode("01110", 0, 10);
+        List<Batch> page0 = repo.findByInstitutionCode(instMine, 0, 10);
         assertThat(page0)
                 .extracting(Batch::getId)
                 .containsExactlyInAnyOrder(mine1.getId(), mine2.getId());
-        assertThat(page0).allMatch(b -> "01110".equals(b.getInstitutionCode()));
+        assertThat(page0).allMatch(b -> instMine.equals(b.getInstitutionCode()));
 
         // Pagination: page size 1 splits the two rows.
-        List<Batch> firstOnly = repo.findByInstitutionCode("01110", 0, 1);
-        List<Batch> secondOnly = repo.findByInstitutionCode("01110", 1, 1);
+        List<Batch> firstOnly = repo.findByInstitutionCode(instMine, 0, 1);
+        List<Batch> secondOnly = repo.findByInstitutionCode(instMine, 1, 1);
         assertThat(firstOnly).hasSize(1);
         assertThat(secondOnly).hasSize(1);
         assertThat(firstOnly.get(0).getId()).isNotEqualTo(secondOnly.get(0).getId());
 
         // countByInstitutionCode: total elements for the monitor.
-        assertThat(repo.countByInstitutionCode("01110")).isEqualTo(2L);
-        assertThat(repo.countByInstitutionCode("02220")).isEqualTo(1L);
-        assertThat(repo.countByInstitutionCode("99999")).isZero();
+        assertThat(repo.countByInstitutionCode(instMine)).isEqualTo(2L);
+        assertThat(repo.countByInstitutionCode(instOther)).isEqualTo(1L);
+        assertThat(repo.countByInstitutionCode(instEmpty)).isZero();
     }
 
     /**
