@@ -82,7 +82,7 @@ class HandleRegistrarApprovalUseCaseTest {
     }
     private RegistrarApprovalEvent approvalEvent(UUID batchId, String decision,
             List<String> rejected, String reason) {
-        return new RegistrarApprovalEvent(batchId.toString(), decision, "KMUTT",
+        return new RegistrarApprovalEvent(null, batchId.toString(), decision, "KMUTT",
             "reg01", Instant.now(), rejected, reason);
     }
 }

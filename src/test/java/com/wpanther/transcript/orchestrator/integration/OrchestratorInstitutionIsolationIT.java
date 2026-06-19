@@ -89,7 +89,7 @@ class OrchestratorInstitutionIsolationIT extends IntegrationTestBase {
 
         // Approval from a DIFFERENT institution — should route to DLQ, batch stays PENDING_REGISTRAR
         kafka.send("approval.registrar", batchId,
-            new RegistrarApprovalEvent(batchId, "APPROVE", "OTHER_UNIVERSITY", "r", Instant.now(), List.of(), null));
+            new RegistrarApprovalEvent(null, batchId, "APPROVE", "OTHER_UNIVERSITY", "r", Instant.now(), List.of(), null));
 
         // C2 fix: wait for the DLQ event (best-effort, tolerates slow delivery),
         // then assert the batch state REMAINS PENDING_REGISTRAR for a 3-second

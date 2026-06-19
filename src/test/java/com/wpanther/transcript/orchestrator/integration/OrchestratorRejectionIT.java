@@ -59,7 +59,7 @@ class OrchestratorRejectionIT extends IntegrationTestBase {
         closeBatch(batchId);
 
         kafka.send("approval.registrar", batchId,
-            new RegistrarApprovalEvent(batchId, "REJECT", "KMUTT", "reg", Instant.now(), null, "Not ready"));
+            new RegistrarApprovalEvent(null, batchId, "REJECT", "KMUTT", "reg", Instant.now(), null, "Not ready"));
 
         assertBatchStatus(batchId, BatchStatus.CANCELLED);
     }
@@ -88,7 +88,7 @@ class OrchestratorRejectionIT extends IntegrationTestBase {
 
         // Registrar approves the batch but rejects doc-1 by id.
         kafka.send("approval.registrar", batchId,
-            new RegistrarApprovalEvent(batchId, "APPROVE", "KMUTT", "reg", Instant.now(),
+            new RegistrarApprovalEvent(null, batchId, "APPROVE", "KMUTT", "reg", Instant.now(),
                 List.of(docId1), null));
 
         // Batch advances to REGISTRAR_SIGNING (not CANCELLED — doc-2 is still ASSIGNED).
