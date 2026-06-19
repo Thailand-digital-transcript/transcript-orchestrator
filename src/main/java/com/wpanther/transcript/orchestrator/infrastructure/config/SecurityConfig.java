@@ -120,7 +120,19 @@ public class SecurityConfig {
         return http.build();
     }
 
-    private JwtAuthenticationConverter jwtConverter() {
+    /**
+     * Maps Keycloak {@code realm_access.roles} entries to
+     * {@code ROLE_<UPPER>} authorities (e.g. {@code registrar} →
+     * {@code ROLE_REGISTRAR}, {@code dean} → {@code ROLE_DEAN}). Returns no
+     * {@code ROLE_} authorities when the {@code realm_access} claim is absent
+     * or malformed.
+     *
+     * <p>Package-private so {@code SecurityConfigTest} (same package) can unit
+     * test the converter logic directly — the integration test profile does
+     * not set {@code KEYCLOAK_ISSUER_URI}, so the JWT bearer filter and this
+     * converter are never exercised by the IT suite.
+     */
+    JwtAuthenticationConverter jwtConverter() {
         JwtAuthenticationConverter conv = new JwtAuthenticationConverter();
         conv.setJwtGrantedAuthoritiesConverter((Jwt jwt) -> {
             Object realm = jwt.getClaims().get("realm_access");

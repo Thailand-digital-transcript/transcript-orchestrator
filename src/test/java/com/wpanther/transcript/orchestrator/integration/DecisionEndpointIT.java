@@ -172,6 +172,13 @@ class DecisionEndpointIT extends IntegrationTestBase {
     }
 
     // ---------- 404: cross-institution APPROVE ----------
+    //
+    // Privacy (spec §4.4, fix I1): a cross-institution caller who knows a
+    // batchId must NOT be able to distinguish "exists but not mine" from
+    // "does not exist" via the response body. The cross-institution 404 body
+    // must therefore EQUAL the missing-batch 404 body (modulo the batch id,
+    // which the caller already supplied in the path). The two cases below pin
+    // the exact body strings and assert their equality.
 
     @Test
     void approve_onForeignInstitutionBatch_returns404() throws Exception {
@@ -182,6 +189,55 @@ class DecisionEndpointIT extends IntegrationTestBase {
                 .content(decisionBody("APPROVE", null, null)))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.error").exists());
+    }
+
+    /**
+     * Fix I1 regression guard: the 404 body for a cross-institution decision
+     * must be byte-for-byte equal to the 404 body for a decision against a
+     * batch that simply does not exist. Both must read
+     * {@code "Batch not found: <id>"} with no caller-institution hint and no
+     * "Institution mismatch" wording, otherwise a cross-institution caller can
+     * tell "not yours" from "does not exist".
+     */
+    @Test
+    void crossInstitutionAndMissingBatch_produce_identical404Body() throws Exception {
+        // Cross-institution: batch exists under institution "99999"; caller is
+        // from "01110". This is the leak vector I1 closes.
+        UUID foreignBatchId = seedBatch("99999", BatchStatus.PENDING_REGISTRAR).getId();
+        String crossBody = mockMvc.perform(post("/api/v1/batches/" + foreignBatchId + "/decision")
+                .with(jwt("registrar1", "01110", "ROLE_REGISTRAR"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(decisionBody("APPROVE", null, null)))
+            .andExpect(status().isNotFound())
+            .andReturn().getResponse().getContentAsString();
+
+        // Missing batch: a random UUID that was never seeded. The body must use
+        // the SAME shape and the SAME id tokenization as the cross-institution
+        // body — both echo the caller-supplied path id verbatim.
+        UUID missingBatchId = UUID.randomUUID();
+        String missingBody = mockMvc.perform(post("/api/v1/batches/" + missingBatchId + "/decision")
+                .with(jwt("registrar1", "01110", "ROLE_REGISTRAR"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(decisionBody("APPROVE", null, null)))
+            .andExpect(status().isNotFound())
+            .andReturn().getResponse().getContentAsString();
+
+        // The only legitimate difference is the embedded id. Substitute the
+        // foreign id into the missing-batch body (and vice-versa) so the two
+        // can be compared character-for-character. Any OTHER difference (e.g.
+        // "Institution mismatch: batch=... approval=01110" leaking through)
+        // fails this assertion.
+        String crossNormalized = crossBody.replace(foreignBatchId.toString(), "<<ID>>");
+        String missingNormalized = missingBody.replace(missingBatchId.toString(), "<<ID>>");
+        org.assertj.core.api.Assertions.assertThat(crossNormalized)
+            .isEqualTo(missingNormalized);
+
+        // Pin the exact shape so a future regression (e.g. re-echoing the
+        // raw exception message) is caught explicitly, not just by inequality.
+        org.assertj.core.api.Assertions.assertThat(crossBody)
+            .isEqualTo("{\"error\":\"Batch not found: " + foreignBatchId + "\"}");
+        org.assertj.core.api.Assertions.assertThat(missingBody)
+            .isEqualTo("{\"error\":\"Batch not found: " + missingBatchId + "\"}");
     }
 
     // ---------- 403: X-API-Key caller has no approver role ----------

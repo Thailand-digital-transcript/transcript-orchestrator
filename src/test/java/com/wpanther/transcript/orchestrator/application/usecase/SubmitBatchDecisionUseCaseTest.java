@@ -54,12 +54,17 @@ class SubmitBatchDecisionUseCaseTest {
         assertThatThrownBy(() -> uc.submit(cmd)).isInstanceOf(InvalidBatchStateException.class);
     }
 
-    @Test void crossInstitutionThrowsMismatch() {
+    @Test void crossInstitutionThrowsBatchNotFound() {
+        // Privacy (spec §4.4, fix I1): a cross-institution caller must not be
+        // able to distinguish "batch exists but is not mine" from "batch does
+        // not exist". The use case therefore throws BatchNotFoundException
+        // (NOT InstitutionMismatchException) on the cross-institution path, so
+        // ApprovalController emits a single indistinguishable 404 body.
         Batch batch = batchAt(BatchStatus.PENDING_REGISTRAR, "99999");
         when(batches.findById(batchId)).thenReturn(Optional.of(batch));
         var cmd = new SubmitDecisionCommand(batchId, BatchStatus.PENDING_REGISTRAR,
                 "alice", "01110", "APPROVE", List.of(), null);
-        assertThatThrownBy(() -> uc.submit(cmd)).isInstanceOf(InstitutionMismatchException.class);
+        assertThatThrownBy(() -> uc.submit(cmd)).isInstanceOf(BatchNotFoundException.class);
     }
 
     @Test void rejectWithoutReasonThrows400() {

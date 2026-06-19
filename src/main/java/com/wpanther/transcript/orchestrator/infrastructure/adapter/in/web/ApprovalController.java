@@ -92,9 +92,39 @@ public class ApprovalController {
     // "does not exist". This OVERRIDES BatchController's 403 handler for
     // InstitutionMismatchException on the decision route, because each
     // @RestController applies its own @ExceptionHandler first.
+    //
+    // The body is NORMALIZED: both cases emit the identical
+    // {"error": "Batch not found: <path-id>"} string. The batch id is read from
+    // the request's URI template variable (not from the exception message), so
+    // even a future code path that throws InstitutionMismatchException with a
+    // different internal message shape cannot leak the caller's institution or
+    // confirm existence. (As of the I1 fix, SubmitBatchDecisionUseCase throws
+    // BatchNotFoundException directly on the cross-institution path, so the two
+    // cases are indistinguishable at every layer.)
     @ExceptionHandler({BatchNotFoundException.class, InstitutionMismatchException.class})
     ResponseEntity<Map<String, String>> notFound(RuntimeException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", ex.getMessage()));
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+            .body(Map.of("error", "Batch not found: " + batchIdFromPath()));
+    }
+
+    /**
+     * Reads the {@code id} path variable from the current request's URI
+     * template variables. Used by {@link #notFound} so both 404 cases (missing
+     * batch and cross-institution) emit an identical body that contains only
+     * the id the caller already supplied — never the caller's institution or
+     * any hint about why the request was rejected.
+     */
+    private String batchIdFromPath() {
+        var attrs = org.springframework.web.context.request.RequestContextHolder
+            .getRequestAttributes();
+        if (attrs instanceof org.springframework.web.context.request.ServletRequestAttributes sra) {
+            Object raw = sra.getRequest().getAttribute(
+                org.springframework.web.servlet.HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
+            if (raw instanceof Map<?, ?> vars && vars.get("id") != null) {
+                return vars.get("id").toString();
+            }
+        }
+        return "unknown";
     }
 
     @ExceptionHandler(InvalidBatchStateException.class)

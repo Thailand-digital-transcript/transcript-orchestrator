@@ -27,10 +27,18 @@ import static org.assertj.core.api.Assertions.assertThat;
  *        {@code anyRequest().authenticated()}).</li>
  * </ol>
  *
- * <p>The JWT-bearing cases (registrar/dean tokens, role mapping, decision
- * authorization) are exercised in {@code DecisionEndpointIT} (A10) using
- * {@code spring-security-test}'s {@code mockJwt()} post-processor with an
- * in-process issuer.
+ * <p><strong>What this suite does NOT exercise (and why):</strong> because
+ * {@code KEYCLOAK_ISSUER_URI} is unset, the {@code oauth2ResourceServer().jwt()}
+ * bearer filter and {@code SecurityConfig#jwtConverter()} never run in the IT
+ * profile. The JWT caller paths (registrar/dean tokens, role mapping, decision
+ * authorization) are covered in {@code DecisionEndpointIT} by manually
+ * constructing a {@code JwtAuthenticationToken} and injecting it via
+ * {@code SecurityMockMvcRequestPostProcessors#authentication(...)} — that
+ * bypasses both the bearer filter and the JWT authorities converter, so it
+ * does NOT prove the converter maps {@code realm_access.roles} to
+ * {@code ROLE_<UPPER>} correctly. That converter logic is pinned separately by
+ * {@code SecurityConfigTest} (a focused unit test that calls
+ * {@code jwtConverter()} directly, fix I2).
  */
 class DualAuthIT extends IntegrationTestBase {
 

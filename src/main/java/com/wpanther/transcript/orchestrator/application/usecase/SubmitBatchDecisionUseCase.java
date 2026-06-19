@@ -25,10 +25,16 @@ public class SubmitBatchDecisionUseCase {
         Batch batch = batchRepository.findById(cmd.batchId())
                 .orElseThrow(() -> new BatchNotFoundException(cmd.batchId().toString()));
 
-        // Cross-institution → mismatch (mapped to 404 in the controller).
+        // Privacy: spec §4.4 — a cross-institution caller must NOT be able to
+        // distinguish "batch exists but belongs to another institution" from
+        // "batch does not exist". Both conditions therefore throw the SAME
+        // exception type (BatchNotFoundException) with the SAME message shape,
+        // so ApprovalController's @ExceptionHandler produces a single,
+        // indistinguishable 404 body. (This is the decision route's own check;
+        // BatchStateMachine.requireInstitution is untouched and still throws
+        // InstitutionMismatchException → 403 for create/assign/close.)
         if (!batch.getInstitutionCode().equals(cmd.institutionCode())) {
-            throw new InstitutionMismatchException(
-                    cmd.batchId().toString(), cmd.institutionCode());
+            throw new BatchNotFoundException(cmd.batchId().toString());
         }
         // Wrong gate → 409.
         if (batch.getStatus() != cmd.callerGate()) {
