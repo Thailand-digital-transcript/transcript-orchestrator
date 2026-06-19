@@ -59,7 +59,9 @@ All runtime config is environment-overridable in `src/main/resources/application
 | `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USERNAME` / `DB_PASSWORD` | `localhost`/`5432`/`transcript_orchestrator_db`/`postgres`/`postgres` | PostgreSQL connection |
 | `KAFKA_BROKERS` | `localhost:9092` | Kafka bootstrap |
 | `S3_ENDPOINT` / `S3_ACCESS_KEY` / `S3_SECRET_KEY` / `S3_REGION` / `S3_XML_BUCKET` | Minio defaults | Object storage for XML/PDF artifacts |
-| `ORCHESTRATOR_API_KEYS` | `dev-key` | Comma-separated valid `X-API-Key` values |
+| `KEYCLOAK_ISSUER` | `http://localhost:8080/realms/transcript` | Expected `iss` claim on every inbound JWT (browser-facing URL) |
+| `KEYCLOAK_JWKS_URI` | `http://localhost:8080/realms/transcript/protocol/openid-connect/certs` | JWKS endpoint used to verify JWT signatures (in-network URL) |
+| `CORS_ALLOWED_ORIGINS` | _(empty)_ | Comma-separated origins allowed by CORS for the browser SPA |
 | `OUTBOX_RELAY_ENABLED` | `true` | Toggles the outbox drain relay |
 | `STUCK_PHASE_TIMEOUT_MINUTES` / `SWEEPER_INTERVAL_MS` | `10` / `60000` | Recovery sweeper tuning |
 | `EUREKA_URL` | `http://localhost:8761/eureka/` | Service registry |
@@ -81,8 +83,11 @@ mvn spring-boot:run
 
 ## REST API
 
-Base path `/api/v1`. **Every non-actuator request must carry an `X-API-Key` header**
-matching `ORCHESTRATOR_API_KEYS` (`/actuator/**` is open).
+Base path `/api/v1`. Every non-actuator request must carry a Keycloak-issued
+JWT bearer token (`Authorization: Bearer <token>`). The token's `iss` is the
+fixed string `KEYCLOAK_ISSUER`; signing keys are fetched from `KEYCLOAK_JWKS_URI`.
+CORS for the browser UI is enabled via `CORS_ALLOWED_ORIGINS`. `/actuator/**`
+is open.
 
 ### Batches — `/api/v1/batches`
 
@@ -153,5 +158,5 @@ src/main/java/com/wpanther/transcript/orchestrator
 
 ## Observability
 
-Actuator endpoints (open, no API key): `health`, `info`, `metrics`, `prometheus` at
+Actuator endpoints (open, no auth): `health`, `info`, `metrics`, `prometheus` at
 `/actuator/*`. Package logging at `DEBUG` for `com.wpanther.transcript.orchestrator`.
