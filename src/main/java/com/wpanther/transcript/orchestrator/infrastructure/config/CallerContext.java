@@ -64,6 +64,12 @@ public class CallerContext {
      * advance: {@code REGISTRAR} → {@code PENDING_REGISTRAR},
      * {@code DEAN} → {@code PENDING_DEAN}. Empty for API-key callers or
      * roles that are not human-gate owners.
+     *
+     * <p>Limitation: a caller holding BOTH roles resolves to the REGISTRAR gate
+     * (checked first); they cannot act on the dean gate through this single-gate
+     * derivation (a dean decision on such a token would 409 on the wrong gate).
+     * Dual-role users are out of scope for Phase A; if needed, add an explicit
+     * {@code ?gate=} request override rather than changing this precedence.
      */
     public Optional<BatchStatus> gateFromRoles() {
         Authentication a = SecurityContextHolder.getContext().getAuthentication();

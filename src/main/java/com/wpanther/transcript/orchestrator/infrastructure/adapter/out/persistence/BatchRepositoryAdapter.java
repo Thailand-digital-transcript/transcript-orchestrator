@@ -5,6 +5,7 @@ import com.wpanther.transcript.orchestrator.domain.model.BatchStatus;
 import com.wpanther.transcript.orchestrator.domain.repository.BatchRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
@@ -15,6 +16,13 @@ import java.util.UUID;
 @Repository
 @RequiredArgsConstructor
 public class BatchRepositoryAdapter implements BatchRepository {
+
+    // Deterministic ordering for every paged/capped list read. Postgres has no
+    // implicit row order, so without this the monitor's page N and page N+1 can
+    // overlap or skip rows, and capped queue reads return an arbitrary 100.
+    // newest-first by createdAt, tie-broken by id so the total order is stable.
+    private static final Sort LIST_SORT =
+            Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.ASC, "id"));
 
     private final SpringDataBatchRepository jpa;
 
@@ -38,7 +46,7 @@ public class BatchRepositoryAdapter implements BatchRepository {
 
     @Override
     public List<Batch> findByStatusIn(List<BatchStatus> statuses, int limit) {
-        return jpa.findByStatusIn(statuses, PageRequest.of(0, limit)).stream()
+        return jpa.findByStatusIn(statuses, PageRequest.of(0, limit, LIST_SORT)).stream()
                 .map(BatchEntity::toDomain)
                 .toList();
     }
@@ -54,7 +62,7 @@ public class BatchRepositoryAdapter implements BatchRepository {
     public List<Batch> findByStatusInAndInstitutionCode(List<BatchStatus> statuses,
                                                        String inst,
                                                        int limit) {
-        return jpa.findByStatusInAndInstitutionCode(statuses, inst, PageRequest.of(0, limit))
+        return jpa.findByStatusInAndInstitutionCode(statuses, inst, PageRequest.of(0, limit, LIST_SORT))
                 .stream()
                 .map(BatchEntity::toDomain)
                 .toList();
@@ -62,7 +70,7 @@ public class BatchRepositoryAdapter implements BatchRepository {
 
     @Override
     public List<Batch> findByInstitutionCode(String inst, int page, int size) {
-        return jpa.findByInstitutionCode(inst, PageRequest.of(page, size))
+        return jpa.findByInstitutionCode(inst, PageRequest.of(page, size, LIST_SORT))
                 .stream()
                 .map(BatchEntity::toDomain)
                 .toList();

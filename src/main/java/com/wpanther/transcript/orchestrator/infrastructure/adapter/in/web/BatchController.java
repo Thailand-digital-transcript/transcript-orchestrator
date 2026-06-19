@@ -32,6 +32,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -106,21 +107,35 @@ public class BatchController {
             // Paginated monitor read: ignore status, all statuses paginated.
             int p = page == null ? 0 : Math.max(page, 0);
             int s = size == null ? 20 : Math.max(size, 1);
+            if (institution.isEmpty() && p > 0) {
+                // Unscoped (API-key) callers have no real paginated query — only a
+                // capped first-page read exists. Rejecting page>0 avoids silently
+                // returning page 0 for every page (which looks like working
+                // pagination but isn't). Production monitor callers are JWT-scoped.
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Pagination beyond page 0 requires institution-scoped (JWT) authentication");
+            }
             batches = institution
                 .<List<Batch>>map(inst -> batchRepository.findByInstitutionCode(inst, p, s))
                 .orElseGet(() -> batchRepository.findByStatusIn(List.of(BatchStatus.values()), s));
-            // Note: the unscoped paginated read falls back to findByStatusIn(all,
-            // size) because the A8 repository contract added no unscoped paginated
-            // method — the monitor is institution-scoped in production (JWT callers).
         } else {
             // Queue read: honour status (single or all), capped at 100.
             List<BatchStatus> statuses = status != null
-                ? List.of(BatchStatus.valueOf(status)) : List.of(BatchStatus.values());
+                ? List.of(parseStatus(status)) : List.of(BatchStatus.values());
             batches = institution
                 .<List<Batch>>map(inst -> batchRepository.findByStatusInAndInstitutionCode(statuses, inst, 100))
                 .orElseGet(() -> batchRepository.findByStatusIn(statuses, 100));
         }
         return ResponseEntity.ok(batches.stream().map(BatchSummary::from).toList());
+    }
+
+    /** Parse a status query param, returning 400 (not 500) for an unknown value. */
+    private static BatchStatus parseStatus(String status) {
+        try {
+            return BatchStatus.valueOf(status);
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown status: " + status);
+        }
     }
 
     @GetMapping("/{id}")

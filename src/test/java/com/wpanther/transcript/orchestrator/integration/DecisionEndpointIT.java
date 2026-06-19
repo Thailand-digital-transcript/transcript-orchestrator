@@ -306,6 +306,41 @@ class DecisionEndpointIT extends IntegrationTestBase {
             .andExpect(status().isNotFound());
     }
 
+    // ---------- list query-param hardening (review fixes) ----------
+
+    @Test
+    void list_unknownStatus_returns400() throws Exception {
+        // An unparseable status must be a 400 (client error), not a 500.
+        mockMvc.perform(get("/api/v1/batches")
+                .param("status", "NOT_A_STATUS")
+                .with(jwt("registrar1", "01110", "ROLE_REGISTRAR"))
+                .accept(MediaType.APPLICATION_JSON))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void list_unscopedPaginationBeyondPage0_returns400() throws Exception {
+        // Unscoped (API-key) callers have no real paginated query — page>0 must be
+        // rejected rather than silently returning page 0.
+        mockMvc.perform(get("/api/v1/batches")
+                .param("page", "1")
+                .param("size", "20")
+                .header("X-API-Key", "test-key")
+                .accept(MediaType.APPLICATION_JSON))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void list_unscopedPage0_isAccepted() throws Exception {
+        // page=0 (or only size) is fine for unscoped callers — first capped page.
+        mockMvc.perform(get("/api/v1/batches")
+                .param("page", "0")
+                .param("size", "20")
+                .header("X-API-Key", "test-key")
+                .accept(MediaType.APPLICATION_JSON))
+            .andExpect(status().isOk());
+    }
+
     // ---------- helpers ----------
 
     /**
