@@ -41,10 +41,10 @@ import java.util.Map;
 public class SecurityConfig {
 
     @Bean
-    SecurityFilterChain filterChain(HttpSecurity http, CorsConfigurationSource cors) throws Exception {
+    SecurityFilterChain filterChain(HttpSecurity http, CorsConfigurationSource corsConfigurationSource) throws Exception {
         http
             .csrf(AbstractHttpConfigurer::disable)
-            .cors(c -> c.configurationSource(cors))
+            .cors(c -> c.configurationSource(corsConfigurationSource))
             .authorizeHttpRequests(a -> a
                 .requestMatchers("/actuator/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/batches/*/decision")
