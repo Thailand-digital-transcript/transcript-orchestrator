@@ -53,12 +53,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Exercises the A10 decision + content endpoints at the HTTP layer with a mix
- * of JWT (registrar/dean) and API-key callers.
+ * of JWT callers holding different roles (registrar vs. dean, with and without
+ * an institution claim).
  *
  * <h3>Mock JWT wiring</h3>
- * The test profile does NOT set {@code KEYCLOAK_ISSUER_URI}, so only the
- * API-key {@code SecurityFilterChain} ({@code apiKeyChain}) is active and no
- * bearer-token filter is configured. To exercise the JWT caller paths
+ * The test profile substitutes a test {@link JwtDecoder}
+ * ({@code TestJwtConfig}) that trusts a local keypair, so we can sign tokens
+ * with the matching private key. To exercise the JWT caller paths
  * ({@code CallerContext.institutionCode()} / {@code gateFromRoles()}, which
  * read a {@link JwtAuthenticationToken}) we therefore cannot rely on
  * {@code SecurityMockMvcRequestPostProcessors#jwt()} alone — that post-processor
@@ -320,8 +321,8 @@ class DecisionEndpointIT extends IntegrationTestBase {
 
     @Test
     void list_unscopedPaginationBeyondPage0_returns400() throws Exception {
-        // Unscoped (API-key) callers have no real paginated query — page>0 must be
-        // rejected rather than silently returning page 0.
+        // Unscoped callers (no institution_code claim) have no real paginated
+        // query — page>0 must be rejected rather than silently returning page 0.
         mockMvc.perform(get("/api/v1/batches")
                 .param("page", "1")
                 .param("size", "20")

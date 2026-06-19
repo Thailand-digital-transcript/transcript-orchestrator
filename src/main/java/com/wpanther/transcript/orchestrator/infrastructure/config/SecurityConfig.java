@@ -87,7 +87,7 @@ public class SecurityConfig {
     /**
      * Maps Keycloak {@code realm_access.roles} to {@code ROLE_<UPPER>}
      * authorities. Package-private so {@code SecurityConfigTest} can call it
-     * directly. Unchanged from the previous dual-auth implementation.
+     * directly.
      */
     JwtAuthenticationConverter jwtConverter() {
         JwtAuthenticationConverter conv = new JwtAuthenticationConverter();
