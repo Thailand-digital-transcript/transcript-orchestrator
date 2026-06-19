@@ -240,15 +240,15 @@ class DecisionEndpointIT extends IntegrationTestBase {
             .isEqualTo("{\"error\":\"Batch not found: " + missingBatchId + "\"}");
     }
 
-    // ---------- 403: X-API-Key caller has no approver role ----------
+    // ---------- 403: JWT without approver role ----------
 
     @Test
-    void apiKeyCaller_decision_returns403() throws Exception {
+    void noApproverRole_decision_returns403() throws Exception {
         Batch batch = seedBatch("01110", BatchStatus.PENDING_REGISTRAR);
-        // ROLE_API (set by ApiKeyFilter) lacks ROLE_REGISTRAR/DEAN → Spring
-        // Security's hasAnyRole("REGISTRAR","DEAN") rejects the request with 403.
+        // No ROLE_REGISTRAR/DEAN → Spring Security's hasAnyRole("REGISTRAR","DEAN")
+        // rejects the request with 403.
         mockMvc.perform(post("/api/v1/batches/" + batch.getId() + "/decision")
-                .header("X-API-Key", "test-key")
+                .with(jwt("user-no-role", "01110"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(decisionBody("APPROVE", null, null)))
             .andExpect(status().isForbidden());
@@ -325,7 +325,7 @@ class DecisionEndpointIT extends IntegrationTestBase {
         mockMvc.perform(get("/api/v1/batches")
                 .param("page", "1")
                 .param("size", "20")
-                .header("X-API-Key", "test-key")
+                .with(jwtNoInstitution("unscoped-user", "ROLE_REGISTRAR"))
                 .accept(MediaType.APPLICATION_JSON))
             .andExpect(status().isBadRequest());
     }
@@ -336,7 +336,7 @@ class DecisionEndpointIT extends IntegrationTestBase {
         mockMvc.perform(get("/api/v1/batches")
                 .param("page", "0")
                 .param("size", "20")
-                .header("X-API-Key", "test-key")
+                .with(jwtNoInstitution("unscoped-user", "ROLE_REGISTRAR"))
                 .accept(MediaType.APPLICATION_JSON))
             .andExpect(status().isOk());
     }

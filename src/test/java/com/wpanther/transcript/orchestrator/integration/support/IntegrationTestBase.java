@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -26,6 +27,7 @@ import org.testcontainers.utility.DockerImageName;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 @Testcontainers
+@Import(TestJwtConfig.class)
 public abstract class IntegrationTestBase {
 
     static final PostgreSQLContainer<?> POSTGRES =
@@ -39,6 +41,16 @@ public abstract class IntegrationTestBase {
             .withUserName("minioadmin").withPassword("minioadmin");
 
     @Autowired protected TestRestTemplate restTemplate;
+
+    /**
+     * A bearer token for the live-HTTP ITs: a registrar scoped to institution
+     * "KMUTT" (the institution every IT's batches use), so institution-scoped
+     * reads (GET /api/v1/batches/{id}) succeed.
+     */
+    protected static String bearerToken() {
+        return com.wpanther.transcript.orchestrator.integration.support.TestTokens
+            .bearer(java.util.List.of("registrar"), "KMUTT", "e2e-it");
+    }
 
     @BeforeAll
     static void startContainers() {
