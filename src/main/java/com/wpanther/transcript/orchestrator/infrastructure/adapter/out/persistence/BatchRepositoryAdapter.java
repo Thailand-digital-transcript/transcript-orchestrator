@@ -49,4 +49,27 @@ public class BatchRepositoryAdapter implements BatchRepository {
                 .map(BatchEntity::toDomain)
                 .toList();
     }
+
+    @Override
+    public List<Batch> findByStatusInAndInstitutionCode(List<BatchStatus> statuses,
+                                                       String inst,
+                                                       int limit) {
+        return jpa.findByStatusInAndInstitutionCode(statuses, inst, PageRequest.of(0, limit))
+                .stream()
+                .map(BatchEntity::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<Batch> findByInstitutionCode(String inst, int page, int size) {
+        return jpa.findByInstitutionCode(inst, PageRequest.of(page, size))
+                .stream()
+                .map(BatchEntity::toDomain)
+                .toList();
+    }
+
+    @Override
+    public long countByInstitutionCode(String inst) {
+        return jpa.countByInstitutionCode(inst);
+    }
 }
