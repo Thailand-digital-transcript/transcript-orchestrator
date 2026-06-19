@@ -19,9 +19,16 @@ public class HandleRegistrarApprovalUseCase {
     private final TranscriptItemRepository itemRepository;
     private final BatchStateMachine stateMachine;
     private final BatchSigningCommandPort signingCommandPort;
+    private final PendingDecisionRepository pendingDecisionRepository;
 
     @Transactional
     public void handle(RegistrarApprovalEvent event) {
+        String decisionId = event.getDecisionId();
+        if (decisionId != null && !pendingDecisionRepository.claim(UUID.fromString(decisionId))) {
+            log.debug("Decision {} already processed; skipping", decisionId);
+            return;
+        }
+
         UUID batchId = UUID.fromString(event.getBatchId());
         Batch batch = batchRepository.findById(batchId)
             .orElseThrow(() -> new BatchNotFoundException(event.getBatchId()));

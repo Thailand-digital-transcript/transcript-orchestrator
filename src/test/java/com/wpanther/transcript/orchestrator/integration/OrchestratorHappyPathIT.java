@@ -71,7 +71,7 @@ class OrchestratorHappyPathIT extends IntegrationTestBase {
 
         // 2. Registrar approves → REGISTRAR_SIGNING command dispatched
         kafka.send("approval.registrar", batchId,
-            new RegistrarApprovalEvent(batchId, "APPROVE", "KMUTT", "reg", Instant.now(), List.of(), null));
+            new RegistrarApprovalEvent(null, batchId, "APPROVE", "KMUTT", "reg", Instant.now(), List.of(), null));
         OutboundBatchSigningCommand c1 = kafka.pollFor("saga.command.transcript-signing.batch",
             "it-sign-1-" + suffix, OutboundBatchSigningCommand.class,
             c -> batchId.equals(c.getBatchId()), Duration.ofSeconds(30));
@@ -84,7 +84,7 @@ class OrchestratorHappyPathIT extends IntegrationTestBase {
 
         // 4. Dean approves → DEAN_SIGNING command
         kafka.send("approval.dean", batchId,
-            new DeanApprovalEvent(batchId, "APPROVE", "KMUTT", "dean", Instant.now(), List.of(), null));
+            new DeanApprovalEvent(null, batchId, "APPROVE", "KMUTT", "dean", Instant.now(), List.of(), null));
         OutboundBatchSigningCommand c2 = kafka.pollFor("saga.command.transcript-signing.batch",
             "it-sign-2-" + suffix, OutboundBatchSigningCommand.class,
             c -> batchId.equals(c.getBatchId()) && "DEAN".equals(c.getSignerRole().name()),

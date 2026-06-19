@@ -9,6 +9,7 @@ import java.time.Instant; import java.util.List;
 @Getter
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class RegistrarApprovalEvent {
+    private final String decisionId;          // null for legacy/event-driven paths
     private final String batchId;
     private final String decision;             // "APPROVE" | "REJECT"
     private final String institutionCode;
@@ -19,6 +20,7 @@ public class RegistrarApprovalEvent {
 
     @JsonCreator
     public RegistrarApprovalEvent(
+            @JsonProperty("decisionId")           String decisionId,
             @JsonProperty("batchId")              String batchId,
             @JsonProperty("decision")             String decision,
             @JsonProperty("institutionCode")      String institutionCode,
@@ -26,6 +28,7 @@ public class RegistrarApprovalEvent {
             @JsonProperty("approvedAt")           Instant approvedAt,
             @JsonProperty("rejectedDocumentIds")  List<String> rejectedDocumentIds,
             @JsonProperty("rejectionReason")      String rejectionReason) {
+        this.decisionId = decisionId;
         this.batchId = batchId; this.decision = decision;
         this.institutionCode = institutionCode; this.approvedBy = approvedBy;
         this.approvedAt = approvedAt;

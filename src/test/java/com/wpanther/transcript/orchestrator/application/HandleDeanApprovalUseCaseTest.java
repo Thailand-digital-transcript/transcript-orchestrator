@@ -19,6 +19,7 @@ class HandleDeanApprovalUseCaseTest {
     @Mock TranscriptItemRepository itemRepository;
     @Mock BatchStateMachine stateMachine;
     @Mock BatchSigningCommandPort signingCommandPort;
+    @Mock PendingDecisionRepository pendingDecisionRepository;
     @InjectMocks HandleDeanApprovalUseCase useCase;
 
     @Test void approve_pendingDean_dispatchesDeanCommand() {
@@ -70,7 +71,7 @@ class HandleDeanApprovalUseCaseTest {
         i.assign(batchId); i.markRegistrarSigned("reg.xml"); return i;
     }
     private DeanApprovalEvent event(UUID batchId, String decision) {
-        return new DeanApprovalEvent(batchId.toString(), decision, "KMUTT",
+        return new DeanApprovalEvent(null, batchId.toString(), decision, "KMUTT",
             "dean01", Instant.now(), List.of(), null);
     }
 }

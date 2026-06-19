@@ -17,6 +17,7 @@ import com.wpanther.transcript.orchestrator.domain.model.Batch;
 import com.wpanther.transcript.orchestrator.domain.model.BatchStatus;
 import com.wpanther.transcript.orchestrator.domain.repository.BatchRepository;
 import com.wpanther.transcript.orchestrator.domain.repository.TranscriptItemRepository;
+import com.wpanther.transcript.orchestrator.infrastructure.config.CallerContext;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -31,6 +32,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -47,6 +49,7 @@ public class BatchController {
     // don't orchestrate domain logic, only project the aggregate for the API.
     private final BatchRepository batchRepository;
     private final TranscriptItemRepository itemRepository;
+    private final CallerContext caller;
 
     @PostMapping
     public ResponseEntity<Map<String, Object>> create(@Valid @RequestBody CreateBatchCommand cmd) {
@@ -75,18 +78,77 @@ public class BatchController {
         return ResponseEntity.ok(Map.of("batchId", b.getId(), "status", b.getStatus()));
     }
 
+    /**
+     * Pinned list contract (A10, spec §4.3 / B9 / B11):
+     *
+     * <ul>
+     *   <li>If <em>either</em> {@code page} or {@code size} is present, ignore
+     *       {@code status} and return ALL statuses paginated (defaults
+     *       {@code page=0}, {@code size=20}). This serves the B11 monitor, which
+     *       sends only {@code page&size}.</li>
+     *   <li>Otherwise honour {@code status} (single status, or all statuses when
+     *       {@code null}) capped at 100. This serves the B9 queue, which sends
+     *       only {@code status}.</li>
+     * </ul>
+     *
+     * <p>JWT callers (with an {@code institution_code} claim) are scoped to
+     * their institution; API-key callers see the unscoped read (the existing
+     * service-side behaviour, retained for backward compatibility).
+     */
     @GetMapping
-    public ResponseEntity<List<BatchSummary>> list(@RequestParam(required = false) String status) {
-        List<BatchStatus> statuses = status != null
-            ? List.of(BatchStatus.valueOf(status)) : List.of(BatchStatus.values());
-        return ResponseEntity.ok(
-            batchRepository.findByStatusIn(statuses, 100).stream().map(BatchSummary::from).toList());
+    public ResponseEntity<List<BatchSummary>> list(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        List<Batch> batches;
+        var institution = caller.institutionCode();
+
+        if (page != null || size != null) {
+            // Paginated monitor read: ignore status, all statuses paginated.
+            int p = page == null ? 0 : Math.max(page, 0);
+            int s = size == null ? 20 : Math.max(size, 1);
+            if (institution.isEmpty() && p > 0) {
+                // Unscoped (API-key) callers have no real paginated query — only a
+                // capped first-page read exists. Rejecting page>0 avoids silently
+                // returning page 0 for every page (which looks like working
+                // pagination but isn't). Production monitor callers are JWT-scoped.
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Pagination beyond page 0 requires institution-scoped (JWT) authentication");
+            }
+            batches = institution
+                .<List<Batch>>map(inst -> batchRepository.findByInstitutionCode(inst, p, s))
+                .orElseGet(() -> batchRepository.findByStatusIn(List.of(BatchStatus.values()), s));
+        } else {
+            // Queue read: honour status (single or all), capped at 100.
+            List<BatchStatus> statuses = status != null
+                ? List.of(parseStatus(status)) : List.of(BatchStatus.values());
+            batches = institution
+                .<List<Batch>>map(inst -> batchRepository.findByStatusInAndInstitutionCode(statuses, inst, 100))
+                .orElseGet(() -> batchRepository.findByStatusIn(statuses, 100));
+        }
+        return ResponseEntity.ok(batches.stream().map(BatchSummary::from).toList());
+    }
+
+    /** Parse a status query param, returning 400 (not 500) for an unknown value. */
+    private static BatchStatus parseStatus(String status) {
+        try {
+            return BatchStatus.valueOf(status);
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown status: " + status);
+        }
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<BatchDetail> getDetail(@PathVariable UUID id) {
         Batch batch = batchRepository.findById(id)
             .orElseThrow(() -> new BatchNotFoundException(id.toString()));
+        // Cross-institution JWT callers get a 404 (BatchNotFoundException, mapped
+        // below) so the detail cannot leak across institutions. API-key callers
+        // (no institution_code) and JWT callers in the matching institution
+        // proceed. Privacy: spec §4.4 — 404 over 403 to avoid confirming existence.
+        if (caller.institutionCode().filter(c -> !c.equals(batch.getInstitutionCode())).isPresent()) {
+            throw new BatchNotFoundException(id.toString());
+        }
         List<TranscriptItemSummary> items = itemRepository.findByBatchId(id).stream()
             .map(TranscriptItemSummary::from).toList();
         return ResponseEntity.ok(BatchDetail.from(batch, items));
