@@ -28,6 +28,15 @@ spring:
   jackson:
     serialization:
       write-dates-as-timestamps: false
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Optional. When set (and non-blank) the SecurityConfig activates the
+          # JWT-aware SecurityFilterChain (IssuerConfiguredCondition). Empty by
+          # default so the API-key-only chain boots (test profile, on-prem
+          # without Keycloak). Phase B sets KEYCLOAK_ISSUER_URI for the SPA.
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:}
 
 camel:
   springboot:
