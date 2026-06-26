@@ -90,8 +90,13 @@ public class TranscriptItem {
         this.updatedAt = Instant.now();
     }
 
-    /** Returns the most recently produced XML key for use as input to the next signing step. */
+    /**
+     * Returns the storage key to feed the next signing step. Through the XAdES phases
+     * this is the most recently produced XML key; once the PDF has been rendered the
+     * next phase is PAdES, which must sign the rendered PDF rather than the sealed XML.
+     */
     public String currentSigningStorageKey() {
+        if (status == ItemStatus.PDF_RENDERED && pdfKey != null) return pdfKey;
         if (sealedXmlKey != null)          return sealedXmlKey;
         if (deanSignedXmlKey != null)      return deanSignedXmlKey;
         if (registrarSignedXmlKey != null) return registrarSignedXmlKey;

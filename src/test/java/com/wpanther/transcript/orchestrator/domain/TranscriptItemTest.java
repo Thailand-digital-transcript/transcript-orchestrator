@@ -59,6 +59,10 @@ class TranscriptItemTest {
         i.markRegistrarSigned("reg.xml"); assertThat(i.currentSigningStorageKey()).isEqualTo("reg.xml");
         i.markDeanSigned("dean.xml");    assertThat(i.currentSigningStorageKey()).isEqualTo("dean.xml");
         i.markSealed("seal.xml");        assertThat(i.currentSigningStorageKey()).isEqualTo("seal.xml");
+        // Once the PDF is rendered, the next signing phase is PAdES over the PDF —
+        // it must sign the rendered PDF, not the sealed XML.
+        i.markPdfRendered("rendered.pdf");
+        assertThat(i.currentSigningStorageKey()).isEqualTo("rendered.pdf");
     }
 
     // G1 Rev 1 fix: explicit null-guard test (independent of the 7 plan tests)
