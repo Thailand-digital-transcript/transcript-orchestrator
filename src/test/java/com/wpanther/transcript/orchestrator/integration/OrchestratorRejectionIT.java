@@ -51,7 +51,7 @@ class OrchestratorRejectionIT extends IntegrationTestBase {
         String docId = "doc-r-" + suffix;
 
         kafka.send("saga.commands.orchestrator", txId,
-            new InboundStartSagaCommand(txId, docId, "KMUTT", "REGULAR", "xmls/" + docId + ".xml"));
+            new InboundStartSagaCommand(txId, docId, "KMUTT", "REGULAR", "2026/07/10/01/transcript-" + docId + ".xml"));
         awaitItemInPool(docId);
 
         String batchId = createBatch("RejectTest-" + suffix, "KMUTT");
@@ -73,9 +73,9 @@ class OrchestratorRejectionIT extends IntegrationTestBase {
         String docId2 = "doc-s2-" + suffix;
 
         kafka.send("saga.commands.orchestrator", txId1,
-            new InboundStartSagaCommand(txId1, docId1, "KMUTT", "REGULAR", "xmls/" + docId1 + ".xml"));
+            new InboundStartSagaCommand(txId1, docId1, "KMUTT", "REGULAR", "2026/07/10/01/transcript-" + docId1 + ".xml"));
         kafka.send("saga.commands.orchestrator", txId2,
-            new InboundStartSagaCommand(txId2, docId2, "KMUTT", "REGULAR", "xmls/" + docId2 + ".xml"));
+            new InboundStartSagaCommand(txId2, docId2, "KMUTT", "REGULAR", "2026/07/10/01/transcript-" + docId2 + ".xml"));
 
         Awaitility.await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {
             String body = get("/api/v1/transcripts", String.class).getBody();

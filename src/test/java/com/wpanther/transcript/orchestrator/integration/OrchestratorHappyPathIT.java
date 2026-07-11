@@ -58,7 +58,7 @@ class OrchestratorHappyPathIT extends IntegrationTestBase {
 
         // 1. StartSagaCommand → transcript appears in pool
         kafka.send("saga.commands.orchestrator", txId,
-            new InboundStartSagaCommand(txId, docId, "KMUTT", "REGULAR", "xmls/" + docId + ".xml"));
+            new InboundStartSagaCommand(txId, docId, "KMUTT", "REGULAR", "2026/07/10/01/transcript-" + docId + ".xml"));
 
         Awaitility.await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
             assertThat(get("/api/v1/transcripts", String.class).getBody()).contains(docId));

@@ -1,5 +1,7 @@
 package com.wpanther.transcript.orchestrator.domain.model;
 
+import com.wpanther.transcript.orchestrator.domain.service.TranscriptKeyResolver;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -46,8 +48,9 @@ public class TranscriptItem {
 
     /**
      * Assigns item to a batch. Requires a non-null originalXmlStorageKey
-     * (G1 Rev 1 fix: guards against null-keyed items that would later NPE
-     * in currentSigningStorageKey()).
+     * (G1 Rev 1 fix: guards against null-keyed items, which would otherwise cause
+     * {@link #latestXmlRef} / {@link #nextSigningSource} to throw
+     * {@code IllegalArgumentException} when the resolver rejects the null key).
      */
     public void assign(UUID batchId) {
         if (this.originalXmlStorageKey == null) {
@@ -95,16 +98,27 @@ public class TranscriptItem {
     }
 
     /**
-     * Returns the storage key to feed the next signing step. Through the XAdES phases
-     * this is the most recently produced XML key; once the PDF has been rendered the
-     * next phase is PAdES, which must sign the rendered PDF rather than the sealed XML.
+     * What the next signing round reads. Walks original → registrar → dean → sealed →
+     * rendered PDF. The PAdES round signs the PDF, not the sealed XML.
      */
-    public String currentSigningStorageKey() {
-        if (status == ItemStatus.PDF_RENDERED && pdfKey != null) return pdfKey;
-        if (sealedXmlKey != null)          return sealedXmlKey;
-        if (deanSignedXmlKey != null)      return deanSignedXmlKey;
-        if (registrarSignedXmlKey != null) return registrarSignedXmlKey;
-        return originalXmlStorageKey;
+    public StorageRef nextSigningSource(TranscriptKeyResolver resolver) {
+        if (status == ItemStatus.PDF_RENDERED && pdfKey != null) return resolver.renderedPdf(originalXmlStorageKey);
+        if (sealedXmlKey != null)          return resolver.sealed(originalXmlStorageKey);
+        if (deanSignedXmlKey != null)      return resolver.deanSigned(originalXmlStorageKey);
+        if (registrarSignedXmlKey != null) return resolver.registrarSigned(originalXmlStorageKey);
+        return resolver.original(originalXmlStorageKey);
+    }
+
+    /**
+     * What the UI displays. Identical to {@link #nextSigningSource} except at
+     * PDF_RENDERED, where the two answers diverge — and where the old single method
+     * handed the viewer a PDF key to presign against the XML bucket. Never returns the PDF.
+     */
+    public StorageRef latestXmlRef(TranscriptKeyResolver resolver) {
+        if (sealedXmlKey != null)          return resolver.sealed(originalXmlStorageKey);
+        if (deanSignedXmlKey != null)      return resolver.deanSigned(originalXmlStorageKey);
+        if (registrarSignedXmlKey != null) return resolver.registrarSigned(originalXmlStorageKey);
+        return resolver.original(originalXmlStorageKey);
     }
 
     public boolean isTerminal() { return status.isTerminal(); }

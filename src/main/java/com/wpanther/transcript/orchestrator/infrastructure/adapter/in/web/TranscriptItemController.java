@@ -6,7 +6,9 @@ import com.wpanther.transcript.orchestrator.application.port.out.XmlReadPort;
 import com.wpanther.transcript.orchestrator.domain.exception.TranscriptItemNotFoundException;
 import com.wpanther.transcript.orchestrator.domain.model.TranscriptItem;
 import com.wpanther.transcript.orchestrator.domain.repository.TranscriptItemRepository;
+import com.wpanther.transcript.orchestrator.domain.service.TranscriptKeyResolver;
 import com.wpanther.transcript.orchestrator.infrastructure.config.CallerContext;
+import com.wpanther.transcript.orchestrator.infrastructure.config.StorageProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +32,7 @@ public class TranscriptItemController {
     private final XmlPresignPort xmlPresignPort;
     private final XmlReadPort xmlReadPort;
     private final CallerContext caller;
+    private final StorageProperties props;
 
     @GetMapping
     public ResponseEntity<List<TranscriptItemSummary>> pool(
@@ -43,8 +46,17 @@ public class TranscriptItemController {
     public ResponseEntity<Map<String, String>> xmlUrl(@PathVariable UUID id) {
         TranscriptItem item = itemRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("Item not found: " + id));
-        String key = item.currentSigningStorageKey();
-        if (key == null) return ResponseEntity.notFound().build();
+        // An item that hasn't had its XML uploaded yet (REGISTERED, originalXmlStorageKey
+        // still null; the column has no NOT NULL constraint) has nothing to resolve — this
+        // restores the old currentSigningStorageKey() 404 behavior for that case. A
+        // non-null but malformed key is a different failure mode (a real bug, not "not
+        // ready yet") and is deliberately left to throw a 500 via the resolver below.
+        if (item.getOriginalXmlStorageKey() == null) return ResponseEntity.notFound().build();
+        // TEMPORARY (removed in Task 5, when StorageProperties gains the three buckets):
+        // the controller still resolves against the single xmlBucket.
+        var resolver = new TranscriptKeyResolver(
+                props.getXmlBucket(), props.getXmlBucket(), props.getXmlBucket());
+        String key = item.latestXmlRef(resolver).key();
         return ResponseEntity.ok(Map.of("url", xmlPresignPort.presign(key)));
     }
 
@@ -66,10 +78,19 @@ public class TranscriptItemController {
         if (caller.institutionCode().filter(c -> !c.equals(item.getInstitutionCode())).isPresent()) {
             throw new TranscriptItemNotFoundException("Item not found: " + id);
         }
-        String key = item.currentSigningStorageKey();
-        if (key == null) {
+        // An item that hasn't had its XML uploaded yet (REGISTERED, originalXmlStorageKey
+        // still null; the column has no NOT NULL constraint) has nothing to resolve — this
+        // restores the old currentSigningStorageKey() 404 behavior for that case. A
+        // non-null but malformed key is a different failure mode (a real bug, not "not
+        // ready yet") and is deliberately left to throw a 500 via the resolver below.
+        if (item.getOriginalXmlStorageKey() == null) {
             throw new TranscriptItemNotFoundException("No signing XML for item: " + id);
         }
+        // TEMPORARY (removed in Task 5, when StorageProperties gains the three buckets):
+        // the controller still resolves against the single xmlBucket.
+        var resolver = new TranscriptKeyResolver(
+                props.getXmlBucket(), props.getXmlBucket(), props.getXmlBucket());
+        String key = item.latestXmlRef(resolver).key();
         StreamingResponseBody body = out -> {
             // MUST close the S3 stream (releases the HTTP connection).
             try (var in = xmlReadPort.getObjectStream(key)) {

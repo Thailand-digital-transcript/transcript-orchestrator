@@ -307,6 +307,34 @@ class DecisionEndpointIT extends IntegrationTestBase {
             .andExpect(status().isNotFound());
     }
 
+    // ---------- 404 (not 500): item registered but XML not yet uploaded ----------
+    //
+    // Regression guard for the null-key bug the reviewer flagged in Task 4: a REGISTERED
+    // item that never went through assign() can have a null originalXmlStorageKey (the
+    // column has no NOT NULL constraint). TranscriptKeyResolver throws on a null key, so
+    // without the controller's explicit null guard both endpoints would 500 instead of the
+    // old currentSigningStorageKey()-era 404.
+
+    @Test
+    void getXmlUrl_itemWithNoUploadedXml_returns404() throws Exception {
+        TranscriptItem item = seedItemWithNullXml("01110");
+
+        mockMvc.perform(get("/api/v1/transcripts/" + item.getId() + "/xml")
+                .with(jwt("registrar1", "01110", "ROLE_REGISTRAR"))
+                .accept(MediaType.APPLICATION_JSON))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getContent_itemWithNoUploadedXml_returns404() throws Exception {
+        TranscriptItem item = seedItemWithNullXml("01110");
+
+        mockMvc.perform(get("/api/v1/transcripts/" + item.getId() + "/content")
+                .with(jwt("registrar1", "01110", "ROLE_REGISTRAR"))
+                .accept(MediaType.APPLICATION_XML))
+            .andExpect(status().isNotFound());
+    }
+
     // ---------- list query-param hardening (review fixes) ----------
 
     @Test
@@ -415,7 +443,7 @@ class DecisionEndpointIT extends IntegrationTestBase {
      */
     private Batch seedBatchWithItem(String institutionCode, BatchStatus target) {
         Batch b = seedBatch(institutionCode, target);
-        String xmlKey = "seed/" + UUID.randomUUID() + ".xml";
+        String xmlKey = "2026/07/10/01/transcript-" + UUID.randomUUID() + ".xml";
         TranscriptItem item = TranscriptItem.register(
             "tx-" + UUID.randomUUID(), "doc-" + UUID.randomUUID(),
             institutionCode, "REGULAR", xmlKey);
@@ -431,8 +459,20 @@ class DecisionEndpointIT extends IntegrationTestBase {
         return itemRepository.save(item);
     }
 
+    /**
+     * Seeds a REGISTERED item with a null originalXmlStorageKey — i.e. registered but
+     * never assign()-ed, so the null-key guard in assign() was never reached. Used by the
+     * 404-not-500 regression tests below.
+     */
+    private TranscriptItem seedItemWithNullXml(String institutionCode) {
+        TranscriptItem item = TranscriptItem.register(
+            "tx-" + UUID.randomUUID(), "doc-" + UUID.randomUUID(),
+            institutionCode, "REGULAR", null);
+        return itemRepository.save(item);
+    }
+
     private String seedXml(String body) {
-        String key = "decision-it/" + UUID.randomUUID() + ".xml";
+        String key = "2026/07/10/01/transcript-" + UUID.randomUUID() + ".xml";
         seeder.putObject(req -> req.bucket(storageProperties.getXmlBucket()).key(key),
             RequestBody.fromString(body, StandardCharsets.UTF_8));
         return key;

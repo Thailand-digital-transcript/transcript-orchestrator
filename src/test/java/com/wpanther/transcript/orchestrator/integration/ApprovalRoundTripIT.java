@@ -308,7 +308,7 @@ class ApprovalRoundTripIT extends IntegrationTestBase {
     private void seedItem(Batch batch, ItemStatus targetStatus) {
         TranscriptItem item = TranscriptItem.register(
             "tx-" + UUID.randomUUID(), "doc-" + UUID.randomUUID(),
-            INSTITUTION, "REGULAR", "seed/" + UUID.randomUUID() + ".xml");
+            INSTITUTION, "REGULAR", "2026/07/10/01/transcript-" + UUID.randomUUID() + ".xml");
         item.assign(batch.getId());
         if (targetStatus == ItemStatus.REGISTRAR_SIGNED) {
             item.markRegistrarSigned("seed/reg-signed/" + UUID.randomUUID() + ".xml");
