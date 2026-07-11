@@ -74,6 +74,12 @@ app:
   orchestrator:
     stuck-phase-timeout-minutes: ${STUCK_PHASE_TIMEOUT_MINUTES:10}
     sweeper-interval-ms:         ${SWEEPER_INTERVAL_MS:60000}
+    # Orphaned-artifact sweep: reclaims the intermediate signed XML left behind by items that
+    # died partway through the saga. Retention is a grace period for post-mortem inspection —
+    # deletion is permanent.
+    orphan-retention-hours:      ${ORPHAN_RETENTION_HOURS:168}
+    orphan-sweeper-interval-ms:  ${ORPHAN_SWEEPER_INTERVAL_MS:3600000}
+    orphan-sweep-batch-size:     ${ORPHAN_SWEEP_BATCH_SIZE:100}
   security:
     cors:
       allowed-origins: ${CORS_ALLOWED_ORIGINS:}

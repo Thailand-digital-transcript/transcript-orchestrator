@@ -1,5 +1,6 @@
 package com.wpanther.transcript.orchestrator.infrastructure.adapter.out.storage;
 
+import com.wpanther.transcript.orchestrator.application.port.out.ArtifactStoragePort;
 import com.wpanther.transcript.orchestrator.application.port.out.XmlPresignPort;
 import com.wpanther.transcript.orchestrator.application.port.out.XmlReadPort;
 import com.wpanther.transcript.orchestrator.infrastructure.config.StorageProperties;
@@ -12,6 +13,7 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
@@ -21,7 +23,7 @@ import java.net.URI;
 import java.time.Duration;
 
 @Component @RequiredArgsConstructor
-public class MinioXmlPresignAdapter implements XmlPresignPort, XmlReadPort {
+public class MinioXmlPresignAdapter implements XmlPresignPort, XmlReadPort, ArtifactStoragePort {
     private final StorageProperties props;
     private S3Presigner presigner;
     private S3Client s3Client;
@@ -61,6 +63,17 @@ public class MinioXmlPresignAdapter implements XmlPresignPort, XmlReadPort {
     @Override
     public ResponseInputStream<GetObjectResponse> getObjectStream(String storageKey) {
         return s3Client.getObject(GetObjectRequest.builder()
+            .bucket(props.getXmlBucket()).key(storageKey).build());
+    }
+
+    /**
+     * Every key the sweeper hands us — registrar/dean/sealed XML and the PAdES-signed PDF —
+     * is written by transcript-signing into its own bucket, which is the same bucket this
+     * service reads from (S3_XML_BUCKET == signed-transcripts). S3 deletes are idempotent,
+     * so a re-run after a partial sweep is a no-op rather than an error.
+     */
+    @Override public void delete(String storageKey) {
+        s3Client.deleteObject(DeleteObjectRequest.builder()
             .bucket(props.getXmlBucket()).key(storageKey).build());
     }
 }

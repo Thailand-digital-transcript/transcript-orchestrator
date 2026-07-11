@@ -24,6 +24,7 @@ class TranscriptItemEntityMapper {
         set(item, "failureReason", e.getFailureReason());
         set(item, "createdAt", e.getCreatedAt());
         set(item, "updatedAt", e.getUpdatedAt());
+        set(item, "artifactsPurgedAt", e.getArtifactsPurgedAt());
     }
 
     private static void set(Object target, String field, Object value) {

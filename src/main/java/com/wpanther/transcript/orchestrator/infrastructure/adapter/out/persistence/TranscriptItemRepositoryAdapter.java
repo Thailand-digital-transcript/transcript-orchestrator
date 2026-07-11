@@ -70,4 +70,12 @@ public class TranscriptItemRepositoryAdapter implements TranscriptItemRepository
                 .map(TranscriptItemEntity::toDomain)
                 .toList();
     }
+
+    @Override
+    public List<TranscriptItem> findTerminalWithUnpurgedArtifacts(java.time.Instant deadBefore, int limit) {
+        return jpa.findTerminalWithUnpurgedArtifacts(deadBefore, PageRequest.of(0, limit))
+                .stream()
+                .map(TranscriptItemEntity::toDomain)
+                .toList();
+    }
 }

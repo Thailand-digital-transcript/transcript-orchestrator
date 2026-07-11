@@ -71,4 +71,50 @@ class TranscriptItemTest {
         assertThatThrownBy(() -> i.assign(UUID.randomUUID()))
             .isInstanceOf(IllegalStateException.class);
     }
+
+    // --- orphaned-artifact purge ---
+
+    private TranscriptItem failedItemWithAllKeys() {
+        TranscriptItem i = TranscriptItem.register("tx-1", "doc-001", "KMUTT", "REGULAR",
+            "2026/07/10/01/original.xml");
+        i.assign(UUID.randomUUID());
+        i.markRegistrarSigned("registrar.xml");
+        i.markDeanSigned("dean.xml");
+        i.markSealed("sealed.xml");
+        i.fail("dean rejected");
+        return i;
+    }
+
+    @Test void purgeableArtifactKeys_neverIncludesTheOriginal() {
+        TranscriptItem i = failedItemWithAllKeys();
+        // The original XML is processing's source of truth and is NOT ours to delete.
+        // Sweeping it would destroy the only copy of the submitted transcript.
+        assertThat(i.purgeableArtifactKeys())
+            .doesNotContain("2026/07/10/01/original.xml")
+            .containsExactlyInAnyOrder("registrar.xml", "dean.xml", "sealed.xml");
+    }
+
+    @Test void purgeableArtifactKeys_skipsUrlShapedValues() {
+        TranscriptItem i = failedItemWithAllKeys();
+        i.markPdfRendered("http://minio:9000/transcript-pdfs/x.pdf?X-Amz-Signature=abc");
+        i.fail("pades failed");
+        // pdfKey currently holds a PRESIGNED URL, not a key, and it lives in a bucket the
+        // orchestrator has no config for. Deleting it as if it were a key in xml-bucket
+        // would target the wrong object. Refuse anything URL-shaped.
+        assertThat(i.purgeableArtifactKeys()).noneMatch(k -> k.startsWith("http"));
+    }
+
+    @Test void purgeableArtifactKeys_isEmptyWhenNothingWasSigned() {
+        TranscriptItem i = TranscriptItem.register("tx-1", "doc-001", "KMUTT", "REGULAR", "o.xml");
+        i.assign(UUID.randomUUID());
+        i.fail("registrar signing failed before any upload");
+        assertThat(i.purgeableArtifactKeys()).isEmpty();
+    }
+
+    @Test void markArtifactsPurged_isIdempotentAndStampsTime() {
+        TranscriptItem i = failedItemWithAllKeys();
+        assertThat(i.getArtifactsPurgedAt()).isNull();
+        i.markArtifactsPurged();
+        assertThat(i.getArtifactsPurgedAt()).isNotNull();
+    }
 }

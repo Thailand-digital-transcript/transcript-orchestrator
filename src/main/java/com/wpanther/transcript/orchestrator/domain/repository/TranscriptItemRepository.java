@@ -2,6 +2,7 @@ package com.wpanther.transcript.orchestrator.domain.repository;
 
 import com.wpanther.transcript.orchestrator.domain.model.ItemStatus;
 import com.wpanther.transcript.orchestrator.domain.model.TranscriptItem;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,4 +16,7 @@ public interface TranscriptItemRepository {
     List<TranscriptItem> findByBatchIdAndStatusIn(UUID batchId, List<ItemStatus> statuses);
     Optional<TranscriptItem> findByBatchIdAndDocumentId(UUID batchId, String documentId);
     List<TranscriptItem> findUnassigned(int limit, int offset);
+
+    /** Terminal items, dead since before {@code deadBefore}, whose artifacts are still unreclaimed. */
+    List<TranscriptItem> findTerminalWithUnpurgedArtifacts(Instant deadBefore, int limit);
 }

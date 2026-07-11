@@ -1,7 +1,10 @@
 package com.wpanther.transcript.orchestrator.domain.model;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 public class TranscriptItem {
 
@@ -22,6 +25,7 @@ public class TranscriptItem {
     private String failureReason;
     private Instant createdAt;
     private Instant updatedAt;
+    private Instant artifactsPurgedAt;
 
     private TranscriptItem() {}
 
@@ -106,6 +110,37 @@ public class TranscriptItem {
     public boolean isTerminal() { return status.isTerminal(); }
     public boolean isHealthy()  { return !isTerminal(); }
 
+    /**
+     * Intermediate signing artifacts that become garbage once this item dies. An item that
+     * fails at, say, the dean phase leaves its registrar-signed XML behind forever: the saga
+     * is forward-only (a failed item is marked FAILED and the healthy ones carry on), so
+     * nothing else ever reclaims them.
+     *
+     * <p>Deliberately excludes two things:
+     * <ul>
+     *   <li>{@code originalXmlStorageKey} — processing's source of truth, and the only copy
+     *       of the submitted transcript. Never ours to delete.</li>
+     *   <li>{@code pdfKey} — despite the name it holds a <em>presigned URL</em>, not a key,
+     *       and it points into a bucket this service has no configuration for. Treating it
+     *       as a key would delete the wrong object. The key-layout change turns it into a
+     *       real reference; it can join the sweep then.</li>
+     * </ul>
+     * The URL guard is applied to every candidate, not just {@code pdfKey}, so the same
+     * confusion cannot silently reappear in another field.
+     */
+    public List<String> purgeableArtifactKeys() {
+        return Stream.of(registrarSignedXmlKey, deanSignedXmlKey, sealedXmlKey, signedPdfKey)
+            .filter(Objects::nonNull)
+            .filter(k -> !k.startsWith("http"))
+            .toList();
+    }
+
+    /** Marks the artifacts reclaimed so the sweeper does not revisit this item. */
+    public void markArtifactsPurged() {
+        this.artifactsPurgedAt = Instant.now();
+        this.updatedAt = this.artifactsPurgedAt;
+    }
+
     public UUID getId()                      { return id; }
     public String getTranscriptId()          { return transcriptId; }
     public String getDocumentId()            { return documentId; }
@@ -123,4 +158,5 @@ public class TranscriptItem {
     public String getFailureReason()         { return failureReason; }
     public Instant getCreatedAt()            { return createdAt; }
     public Instant getUpdatedAt()            { return updatedAt; }
+    public Instant getArtifactsPurgedAt()    { return artifactsPurgedAt; }
 }

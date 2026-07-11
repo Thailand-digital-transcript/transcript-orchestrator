@@ -47,6 +47,9 @@ public class TranscriptItemEntity {
     @Column(nullable = false)
     private Instant updatedAt;
 
+    /** Set once the orphaned-artifact sweeper has reclaimed this item's intermediates. */
+    private Instant artifactsPurgedAt;
+
     /**
      * N5 fix: keep updated_at in sync with each persist/update so item-level
      * staleness queries (and any future stuck-item sweeper) can rely on it.
@@ -77,6 +80,7 @@ public class TranscriptItemEntity {
         e.failureReason = i.getFailureReason();
         e.createdAt = i.getCreatedAt();
         e.updatedAt = i.getUpdatedAt();
+        e.artifactsPurgedAt = i.getArtifactsPurgedAt();
         return e;
     }
 
