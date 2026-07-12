@@ -32,8 +32,19 @@ public class OutboxBatchSigningCommandAdapter implements BatchSigningCommandPort
             // consumer), documentNumber is a deliberate duplicate of
             // documentId for backwards compatibility — verify against the
             // signing-service plan if the field is ever repurposed.
-            .map(i -> new OutboundBatchSigningCommand.Item(
-                i.getDocumentId(), i.getDocumentId(), i.nextSigningSource(resolver).key()))
+            .map(i -> {
+                StorageRef source = i.nextSigningSource(resolver);
+                StorageRef target = switch (signerRole) {
+                    case REGISTRAR -> resolver.registrarSigned(i.getOriginalXmlStorageKey());
+                    case DEAN      -> resolver.deanSigned(i.getOriginalXmlStorageKey());
+                    case SEAL      -> format == SigningFormat.PDF
+                            ? resolver.sealedPdf(i.getOriginalXmlStorageKey())
+                            : resolver.sealed(i.getOriginalXmlStorageKey());
+                };
+                return new OutboundBatchSigningCommand.Item(
+                        i.getDocumentId(), i.getDocumentId(),
+                        source.key(), source.bucket(), target.key());
+            })
             .toList();
 
         OutboundBatchSigningCommand command = new OutboundBatchSigningCommand(

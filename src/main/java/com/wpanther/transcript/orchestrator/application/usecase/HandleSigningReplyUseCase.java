@@ -53,11 +53,21 @@ public class HandleSigningReplyUseCase {
         List<TranscriptItem> items = itemRepository.findByBatchId(batch.getId());
         BatchStatus beforeStatus = batch.getStatus();
 
+        reply.getItems().stream().filter(InboundBatchSigningReplyEvent.ItemResult::isSigned)
+            .forEach(r -> {
+                if (r.getSignedDocKey() == null) {
+                    throw new IllegalStateException(
+                        "Signing reply for " + r.getDocumentId() + " carried no signedDocKey. "
+                        + "The DTO is ignoreUnknown, so a one-sided rename deserializes to null "
+                        + "here and would store null signed-XML keys, failing rounds later.");
+                }
+            });
+
         Map<String, String> successByDocId = reply.getItems().stream()
             .filter(InboundBatchSigningReplyEvent.ItemResult::isSigned)
             .collect(Collectors.toMap(
                 InboundBatchSigningReplyEvent.ItemResult::getDocumentId,
-                InboundBatchSigningReplyEvent.ItemResult::getSignedDocUrl));
+                InboundBatchSigningReplyEvent.ItemResult::getSignedDocKey));
         Map<String, String> errorByDocId = reply.getItems().stream()
             .filter(r -> !r.isSigned())
             .collect(Collectors.toMap(

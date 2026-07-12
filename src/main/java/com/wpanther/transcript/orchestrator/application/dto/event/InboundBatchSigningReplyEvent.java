@@ -52,7 +52,7 @@ public class InboundBatchSigningReplyEvent {
     public static class ItemResult {
         private final String documentId;
         private final String status;       // "SIGNED" | "FAILED"
-        private final String signedDocUrl;
+        private final String signedDocKey;
         private final Long signedDocSize;
         private final String errorMessage;
 
@@ -60,19 +60,19 @@ public class InboundBatchSigningReplyEvent {
         public ItemResult(
                 @JsonProperty("documentId")    String documentId,
                 @JsonProperty("status")        String status,
-                @JsonProperty("signedDocUrl")  String signedDocUrl,
+                @JsonProperty("signedDocKey")  String signedDocKey,
                 @JsonProperty("signedDocSize") Long signedDocSize,
                 @JsonProperty("errorMessage")  String errorMessage) {
             this.documentId = documentId;
             this.status = status;
-            this.signedDocUrl = signedDocUrl;
+            this.signedDocKey = signedDocKey;
             this.signedDocSize = signedDocSize;
             this.errorMessage = errorMessage;
         }
 
         public String getDocumentId()   { return documentId; }
         public String getStatus()       { return status; }
-        public String getSignedDocUrl() { return signedDocUrl; }
+        public String getSignedDocKey() { return signedDocKey; }
         public Long getSignedDocSize()  { return signedDocSize; }
         public String getErrorMessage() { return errorMessage; }
 
