@@ -48,11 +48,26 @@ public class HandlePdfGenerationReplyUseCase {
 
         List<TranscriptItem> items = itemRepository.findByBatchId(batch.getId());
 
+        // The reply DTO is @JsonIgnoreProperties(ignoreUnknown = true): if the producer
+        // (transcript-pdf-generation) ever renames its field back without this side moving
+        // in lockstep, Jackson silently deserializes pdfKey to null instead of failing to
+        // parse. This assertion is the only thing that would catch that typo.
+        reply.getItems().stream()
+            .filter(InboundPdfGenerationReplyEvent.ItemResult::isGenerated)
+            .forEach(r -> {
+                if (r.getPdfKey() == null) {
+                    throw new IllegalStateException(
+                        "PDF reply for " + r.getDocumentId() + " carried no pdfKey. The reply DTO is "
+                        + "@JsonIgnoreProperties(ignoreUnknown=true), so a renamed field on the "
+                        + "producer deserializes to null here rather than failing loudly.");
+                }
+            });
+
         Map<String, String> successByDocId = reply.getItems().stream()
             .filter(InboundPdfGenerationReplyEvent.ItemResult::isGenerated)
             .collect(Collectors.toMap(
                 InboundPdfGenerationReplyEvent.ItemResult::getDocumentId,
-                InboundPdfGenerationReplyEvent.ItemResult::getPdfUrl));
+                InboundPdfGenerationReplyEvent.ItemResult::getPdfKey));
         Map<String, String> errorByDocId = reply.getItems().stream()
             .filter(r -> !r.isGenerated())
             .collect(Collectors.toMap(

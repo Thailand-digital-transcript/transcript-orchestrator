@@ -3,6 +3,7 @@ package com.wpanther.transcript.orchestrator.infrastructure.adapter.out.messagin
 import com.wpanther.transcript.saga.infrastructure.outbox.OutboxService;
 import com.wpanther.transcript.orchestrator.application.port.out.PdfGenerationCommandPort;
 import com.wpanther.transcript.orchestrator.domain.model.*;
+import com.wpanther.transcript.orchestrator.domain.service.TranscriptKeyResolver;
 import com.wpanther.transcript.orchestrator.infrastructure.adapter.out.messaging.dto.OutboundPdfGenerationCommand;
 import com.wpanther.transcript.orchestrator.infrastructure.config.KafkaTopicProperties;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,7 @@ import java.util.UUID;
 public class OutboxPdfGenerationCommandAdapter implements PdfGenerationCommandPort {
     private final OutboxService outboxService;
     private final KafkaTopicProperties topics;
+    private final TranscriptKeyResolver resolver;
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
@@ -26,7 +28,9 @@ public class OutboxPdfGenerationCommandAdapter implements PdfGenerationCommandPo
 
         List<OutboundPdfGenerationCommand.Item> commandItems = items.stream()
             .map(i -> new OutboundPdfGenerationCommand.Item(
-                i.getDocumentId(), i.getDocumentId(), i.getSealedXmlKey()))
+                i.getDocumentId(), i.getDocumentId(),
+                i.nextSigningSource(resolver).key(),
+                resolver.renderedPdf(i.getOriginalXmlStorageKey()).key()))
             .toList();
 
         OutboundPdfGenerationCommand command = new OutboundPdfGenerationCommand(

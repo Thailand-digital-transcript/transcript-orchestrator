@@ -48,18 +48,22 @@ public class OutboundPdfGenerationCommand extends SagaCommand {
         private final String documentId;
         private final String documentNumber;
         private final String sealedXmlStorageKey;
+        private final String targetPdfKey;
 
         @JsonCreator
         public Item(@JsonProperty("documentId") String documentId,
                     @JsonProperty("documentNumber") String documentNumber,
-                    @JsonProperty("sealedXmlStorageKey") String sealedXmlStorageKey) {
+                    @JsonProperty("sealedXmlStorageKey") String sealedXmlStorageKey,
+                    @JsonProperty("targetPdfKey") String targetPdfKey) {
             this.documentId = documentId;
             this.documentNumber = documentNumber;
             this.sealedXmlStorageKey = sealedXmlStorageKey;
+            this.targetPdfKey = targetPdfKey;
         }
 
         public String getDocumentId()          { return documentId; }
         public String getDocumentNumber()      { return documentNumber; }
         public String getSealedXmlStorageKey() { return sealedXmlStorageKey; }
+        public String getTargetPdfKey()        { return targetPdfKey; }
     }
 }

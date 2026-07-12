@@ -53,7 +53,7 @@ public class InboundPdfGenerationReplyEvent {
     public static class ItemResult {
         private final String documentId;
         private final String status;       // "GENERATED" | "FAILED"
-        private final String pdfUrl;
+        private final String pdfKey;
         private final Long pdfSize;
         private final String errorMessage;
 
@@ -61,19 +61,19 @@ public class InboundPdfGenerationReplyEvent {
         public ItemResult(
                 @JsonProperty("documentId")  String documentId,
                 @JsonProperty("status")      String status,
-                @JsonProperty("pdfUrl")      String pdfUrl,
+                @JsonProperty("pdfKey")      String pdfKey,
                 @JsonProperty("pdfSize")     Long pdfSize,
                 @JsonProperty("errorMessage") String errorMessage) {
             this.documentId = documentId;
             this.status = status;
-            this.pdfUrl = pdfUrl;
+            this.pdfKey = pdfKey;
             this.pdfSize = pdfSize;
             this.errorMessage = errorMessage;
         }
 
         public String getDocumentId()   { return documentId; }
         public String getStatus()       { return status; }
-        public String getPdfUrl()       { return pdfUrl; }
+        public String getPdfKey()       { return pdfKey; }
         public Long getPdfSize()        { return pdfSize; }
         public String getErrorMessage() { return errorMessage; }
 

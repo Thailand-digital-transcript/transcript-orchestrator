@@ -23,10 +23,12 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -62,6 +64,23 @@ class HandlePdfGenerationReplyUseCaseTest {
 
         assertThatCode(() -> useCase.handle(reply("unk", UUID.randomUUID(), "d", "k")))
             .doesNotThrowAnyException();
+    }
+
+    @Test
+    void generatedItemWithNullPdfKey_throwsIllegalState_ratherThanStoringNull() {
+        // A renamed field on the producer side would silently deserialize to null here
+        // (the DTO is @JsonIgnoreProperties(ignoreUnknown = true)) rather than failing to
+        // parse — this guard is the only thing that catches that typo.
+        Batch batch = batchInPdfGeneration();
+        UUID batchId = batch.getId();
+        when(batchRepository.findByAwaitingReplyFor("corr-pdf")).thenReturn(Optional.of(batch));
+
+        assertThatThrownBy(() -> useCase.handle(reply("corr-pdf", batchId, "doc-1", null)))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("doc-1")
+            .hasMessageContaining("pdfKey");
+
+        verify(stateMachine, never()).pdfGenerationReply(any(), any(), any(), any(), any());
     }
 
     private Batch batchInPdfGeneration() {
