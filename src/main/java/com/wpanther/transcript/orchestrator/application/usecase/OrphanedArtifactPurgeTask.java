@@ -1,8 +1,10 @@
 package com.wpanther.transcript.orchestrator.application.usecase;
 
 import com.wpanther.transcript.orchestrator.application.port.out.ArtifactStoragePort;
+import com.wpanther.transcript.orchestrator.domain.model.StorageRef;
 import com.wpanther.transcript.orchestrator.domain.model.TranscriptItem;
 import com.wpanther.transcript.orchestrator.domain.repository.TranscriptItemRepository;
+import com.wpanther.transcript.orchestrator.domain.service.TranscriptKeyResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,7 @@ public class OrphanedArtifactPurgeTask {
 
     private final TranscriptItemRepository itemRepository;
     private final ArtifactStoragePort artifactStorage;
+    private final TranscriptKeyResolver resolver;
 
     /**
      * Deletes before marking. If the delete succeeds and the commit then fails, the next
@@ -32,13 +35,13 @@ public class OrphanedArtifactPurgeTask {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void purge(TranscriptItem item) {
-        List<String> keys = item.purgeableArtifactKeys();
-        for (String key : keys) {
-            artifactStorage.delete(key);
+        List<StorageRef> refs = item.purgeableArtifactRefs(resolver);
+        for (StorageRef ref : refs) {
+            artifactStorage.delete(ref);
         }
         item.markArtifactsPurged();
         itemRepository.save(item);
         log.info("Purged {} orphaned artifact(s) for terminal item {} (status={})",
-                keys.size(), item.getTranscriptId(), item.getStatus());
+                refs.size(), item.getTranscriptId(), item.getStatus());
     }
 }

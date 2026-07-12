@@ -6,7 +6,6 @@ import com.wpanther.transcript.orchestrator.domain.model.*;
 import com.wpanther.transcript.orchestrator.domain.service.TranscriptKeyResolver;
 import com.wpanther.transcript.orchestrator.infrastructure.adapter.out.messaging.dto.OutboundBatchSigningCommand;
 import com.wpanther.transcript.orchestrator.infrastructure.config.KafkaTopicProperties;
-import com.wpanther.transcript.orchestrator.infrastructure.config.StorageProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -19,7 +18,7 @@ import java.util.UUID;
 public class OutboxBatchSigningCommandAdapter implements BatchSigningCommandPort {
     private final OutboxService outboxService;
     private final KafkaTopicProperties topics;
-    private final StorageProperties props;
+    private final TranscriptKeyResolver resolver;
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
@@ -27,11 +26,6 @@ public class OutboxBatchSigningCommandAdapter implements BatchSigningCommandPort
             SignerRole signerRole, SigningFormat format) {
         String correlationId = UUID.randomUUID().toString();
         batch.applySigningStarted(correlationId);
-
-        // TEMPORARY (removed in Task 5, when StorageProperties gains the three buckets):
-        // the adapter still resolves against the single xmlBucket.
-        var resolver = new TranscriptKeyResolver(
-                props.getXmlBucket(), props.getXmlBucket(), props.getXmlBucket());
 
         List<OutboundBatchSigningCommand.Item> commandItems = items.stream()
             // N2 note: per the downstream contract (transcript-signing

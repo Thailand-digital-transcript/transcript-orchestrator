@@ -3,6 +3,7 @@ package com.wpanther.transcript.orchestrator.infrastructure.adapter.out.storage;
 import com.wpanther.transcript.orchestrator.application.port.out.ArtifactStoragePort;
 import com.wpanther.transcript.orchestrator.application.port.out.XmlPresignPort;
 import com.wpanther.transcript.orchestrator.application.port.out.XmlReadPort;
+import com.wpanther.transcript.orchestrator.domain.model.StorageRef;
 import com.wpanther.transcript.orchestrator.infrastructure.config.StorageProperties;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -16,11 +17,13 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.List;
 
 @Component @RequiredArgsConstructor
 public class MinioXmlPresignAdapter implements XmlPresignPort, XmlReadPort, ArtifactStoragePort {
@@ -42,6 +45,16 @@ public class MinioXmlPresignAdapter implements XmlPresignPort, XmlReadPort, Arti
             .region(Region.of(props.getRegion()))
             .credentialsProvider(creds)
             .build();
+
+        // With three bucket properties instead of one, a typo would otherwise surface as a
+        // 404 deep inside the registrar round, hours later. Fail at boot instead.
+        for (String bucket : List.of(props.getOriginalBucket(), props.getSignedBucket(), props.getPdfBucket())) {
+            try {
+                s3Client.headBucket(HeadBucketRequest.builder().bucket(bucket).build());
+            } catch (Exception e) {
+                throw new IllegalStateException("Configured bucket is unreachable: " + bucket, e);
+            }
+        }
     }
 
     @PreDestroy void close() {
@@ -52,28 +65,27 @@ public class MinioXmlPresignAdapter implements XmlPresignPort, XmlReadPort, Arti
         if (presigner != null) presigner.close();
     }
 
-    @Override public String presign(String storageKey) {
+    @Override public String presign(StorageRef ref) {
         return presigner.presignGetObject(GetObjectPresignRequest.builder()
             .signatureDuration(Duration.ofMinutes(props.getPresignDurationMinutes()))
             .getObjectRequest(GetObjectRequest.builder()
-                .bucket(props.getXmlBucket()).key(storageKey).build())
+                .bucket(ref.bucket()).key(ref.key()).build())
             .build()).url().toString();
     }
 
     @Override
-    public ResponseInputStream<GetObjectResponse> getObjectStream(String storageKey) {
+    public ResponseInputStream<GetObjectResponse> getObjectStream(StorageRef ref) {
         return s3Client.getObject(GetObjectRequest.builder()
-            .bucket(props.getXmlBucket()).key(storageKey).build());
+            .bucket(ref.bucket()).key(ref.key()).build());
     }
 
     /**
-     * Every key the sweeper hands us — registrar/dean/sealed XML and the PAdES-signed PDF —
-     * is written by transcript-signing into its own bucket, which is the same bucket this
-     * service reads from (S3_XML_BUCKET == signed-transcripts). S3 deletes are idempotent,
-     * so a re-run after a partial sweep is a no-op rather than an error.
+     * Every ref the sweeper hands us — registrar/dean/sealed XML and the PAdES-signed PDF —
+     * carries its own bucket, resolved by {@code TranscriptKeyResolver}. S3 deletes are
+     * idempotent, so a re-run after a partial sweep is a no-op rather than an error.
      */
-    @Override public void delete(String storageKey) {
+    @Override public void delete(StorageRef ref) {
         s3Client.deleteObject(DeleteObjectRequest.builder()
-            .bucket(props.getXmlBucket()).key(storageKey).build());
+            .bucket(ref.bucket()).key(ref.key()).build());
     }
 }

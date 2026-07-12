@@ -3,10 +3,9 @@ package com.wpanther.transcript.orchestrator.domain.model;
 import com.wpanther.transcript.orchestrator.domain.service.TranscriptKeyResolver;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
-import java.util.stream.Stream;
 
 public class TranscriptItem {
 
@@ -125,28 +124,26 @@ public class TranscriptItem {
     public boolean isHealthy()  { return !isTerminal(); }
 
     /**
-     * Intermediate signing artifacts that become garbage once this item dies. An item that
-     * fails at, say, the dean phase leaves its registrar-signed XML behind forever: the saga
-     * is forward-only (a failed item is marked FAILED and the healthy ones carry on), so
+     * Intermediate artifacts that become garbage once this item dies. The saga is
+     * forward-only — a failed item is marked FAILED and the healthy ones carry on — so
      * nothing else ever reclaims them.
      *
-     * <p>Deliberately excludes two things:
-     * <ul>
-     *   <li>{@code originalXmlStorageKey} — processing's source of truth, and the only copy
-     *       of the submitted transcript. Never ours to delete.</li>
-     *   <li>{@code pdfKey} — despite the name it holds a <em>presigned URL</em>, not a key,
-     *       and it points into a bucket this service has no configuration for. Treating it
-     *       as a key would delete the wrong object. The key-layout change turns it into a
-     *       real reference; it can join the sweep then.</li>
-     * </ul>
-     * The URL guard is applied to every candidate, not just {@code pdfKey}, so the same
-     * confusion cannot silently reappear in another field.
+     * <p>Now spans two buckets: the signed XML/PDF artifacts in signed-transcripts, and the
+     * rendered PDF in transcript-pdfs. pdfKey was previously excluded ONLY because it held a
+     * presigned URL rather than a key; that is fixed, so it is reclaimed like the rest. The
+     * startsWith("http") guard that worked around it is gone with the bug.
+     *
+     * <p>originalXmlStorageKey remains excluded: it is processing's source of truth and the
+     * only copy of the submitted transcript. Never ours to delete.
      */
-    public List<String> purgeableArtifactKeys() {
-        return Stream.of(registrarSignedXmlKey, deanSignedXmlKey, sealedXmlKey, signedPdfKey)
-            .filter(Objects::nonNull)
-            .filter(k -> !k.startsWith("http"))
-            .toList();
+    public List<StorageRef> purgeableArtifactRefs(TranscriptKeyResolver resolver) {
+        List<StorageRef> refs = new ArrayList<>();
+        if (registrarSignedXmlKey != null) refs.add(resolver.registrarSigned(originalXmlStorageKey));
+        if (deanSignedXmlKey != null)      refs.add(resolver.deanSigned(originalXmlStorageKey));
+        if (sealedXmlKey != null)          refs.add(resolver.sealed(originalXmlStorageKey));
+        if (pdfKey != null)                refs.add(resolver.renderedPdf(originalXmlStorageKey));
+        if (signedPdfKey != null)          refs.add(resolver.sealedPdf(originalXmlStorageKey));
+        return refs;
     }
 
     /** Marks the artifacts reclaimed so the sweeper does not revisit this item. */

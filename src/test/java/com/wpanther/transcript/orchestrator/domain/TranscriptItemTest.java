@@ -146,8 +146,7 @@ class TranscriptItemTest {
     // --- orphaned-artifact purge ---
 
     private TranscriptItem failedItemWithAllKeys() {
-        TranscriptItem i = TranscriptItem.register("tx-1", "doc-001", "KMUTT", "REGULAR",
-            "2026/07/10/01/original.xml");
+        TranscriptItem i = TranscriptItem.register("tx-1", "doc-001", "KMUTT", "REGULAR", ORIG);
         i.assign(UUID.randomUUID());
         i.markRegistrarSigned("registrar.xml");
         i.markDeanSigned("dean.xml");
@@ -160,9 +159,10 @@ class TranscriptItemTest {
         TranscriptItem i = failedItemWithAllKeys();
         // The original XML is processing's source of truth and is NOT ours to delete.
         // Sweeping it would destroy the only copy of the submitted transcript.
-        assertThat(i.purgeableArtifactKeys())
-            .doesNotContain("2026/07/10/01/original.xml")
-            .containsExactlyInAnyOrder("registrar.xml", "dean.xml", "sealed.xml");
+        assertThat(i.purgeableArtifactRefs(resolver))
+            .doesNotContain(resolver.original(ORIG))
+            .containsExactlyInAnyOrder(
+                resolver.registrarSigned(ORIG), resolver.deanSigned(ORIG), resolver.sealed(ORIG));
     }
 
     @Test void purgeableArtifactKeys_skipsUrlShapedValues() {
@@ -170,16 +170,18 @@ class TranscriptItemTest {
         i.markPdfRendered("http://minio:9000/transcript-pdfs/x.pdf?X-Amz-Signature=abc");
         i.fail("pades failed");
         // pdfKey currently holds a PRESIGNED URL, not a key, and it lives in a bucket the
-        // orchestrator has no config for. Deleting it as if it were a key in xml-bucket
-        // would target the wrong object. Refuse anything URL-shaped.
-        assertThat(i.purgeableArtifactKeys()).noneMatch(k -> k.startsWith("http"));
+        // orchestrator has no config for. purgeableArtifactRefs checks pdfKey ONLY as a
+        // presence flag and never reads its literal value — it always derives a clean ref
+        // via the resolver, so it structurally cannot leak whatever garbage (URL or
+        // otherwise) pdfKey holds.
+        assertThat(i.purgeableArtifactRefs(resolver)).contains(resolver.renderedPdf(ORIG));
     }
 
     @Test void purgeableArtifactKeys_isEmptyWhenNothingWasSigned() {
         TranscriptItem i = TranscriptItem.register("tx-1", "doc-001", "KMUTT", "REGULAR", "o.xml");
         i.assign(UUID.randomUUID());
         i.fail("registrar signing failed before any upload");
-        assertThat(i.purgeableArtifactKeys()).isEmpty();
+        assertThat(i.purgeableArtifactRefs(resolver)).isEmpty();
     }
 
     @Test void markArtifactsPurged_isIdempotentAndStampsTime() {

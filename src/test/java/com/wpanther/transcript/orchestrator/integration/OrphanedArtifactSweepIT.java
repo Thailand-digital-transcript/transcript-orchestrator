@@ -1,7 +1,9 @@
 package com.wpanther.transcript.orchestrator.integration;
 
+import com.wpanther.transcript.orchestrator.domain.model.StorageRef;
 import com.wpanther.transcript.orchestrator.domain.model.TranscriptItem;
 import com.wpanther.transcript.orchestrator.domain.repository.TranscriptItemRepository;
+import com.wpanther.transcript.orchestrator.domain.service.TranscriptKeyResolver;
 import com.wpanther.transcript.orchestrator.integration.support.IntegrationTestBase;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class OrphanedArtifactSweepIT extends IntegrationTestBase {
 
     @Autowired TranscriptItemRepository items;
+    @Autowired TranscriptKeyResolver resolver;
 
     /**
      * Left unassigned on purpose: batch_id carries a foreign key, and the batch an item
@@ -28,9 +31,9 @@ class OrphanedArtifactSweepIT extends IntegrationTestBase {
      * artifacts_purged_at alone.
      */
     private TranscriptItem persistedItem(String txId) {
-        TranscriptItem i = TranscriptItem.register(txId, "doc-" + txId, "KMUTT", "REGULAR",
-                "original/" + txId + ".xml");
-        i.markRegistrarSigned(txId + "/registrar.xml");
+        TranscriptItem i = TranscriptItem.register(txId, "doc-" + txId, "KMUTT", "01",
+                "2026/07/10/01/transcript-" + txId + ".xml");
+        i.markRegistrarSigned("2026/07/10/01/transcript-" + txId + ".registrar.xml");
         return i;
     }
 
@@ -84,7 +87,8 @@ class OrphanedArtifactSweepIT extends IntegrationTestBase {
         TranscriptItem reloaded = items.findByTranscriptId(item.getTranscriptId()).orElseThrow();
         assertThat(reloaded.getArtifactsPurgedAt()).isNotNull();
         // The keys must survive too — the sweeper reads them back off a reloaded row.
-        assertThat(reloaded.purgeableArtifactKeys())
-                .containsExactly(item.getTranscriptId() + "/registrar.xml");
+        assertThat(reloaded.purgeableArtifactRefs(resolver))
+                .containsExactly(new StorageRef("signed-transcripts",
+                        "2026/07/10/01/transcript-" + item.getTranscriptId() + ".registrar.xml"));
     }
 }

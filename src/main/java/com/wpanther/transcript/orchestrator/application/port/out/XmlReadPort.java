@@ -1,5 +1,6 @@
 package com.wpanther.transcript.orchestrator.application.port.out;
 
+import com.wpanther.transcript.orchestrator.domain.model.StorageRef;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 
@@ -11,5 +12,5 @@ import software.amazon.awssdk.services.s3.model.GetObjectResponse;
  */
 public interface XmlReadPort {
     /** Open a stream to the object. Caller MUST close it (releases the HTTP connection). */
-    ResponseInputStream<GetObjectResponse> getObjectStream(String storageKey);
+    ResponseInputStream<GetObjectResponse> getObjectStream(StorageRef ref);
 }

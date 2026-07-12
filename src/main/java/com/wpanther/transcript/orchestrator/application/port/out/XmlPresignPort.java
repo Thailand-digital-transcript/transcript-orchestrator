@@ -1,4 +1,7 @@
 package com.wpanther.transcript.orchestrator.application.port.out;
+
+import com.wpanther.transcript.orchestrator.domain.model.StorageRef;
+
 public interface XmlPresignPort {
-    String presign(String storageKey);
+    String presign(StorageRef ref);
 }

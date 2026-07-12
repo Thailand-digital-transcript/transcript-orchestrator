@@ -104,9 +104,13 @@ class DecisionEndpointIT extends IntegrationTestBase {
 
     @BeforeEach
     void ensureBucket() {
+        // Belt-and-suspenders: IntegrationTestBase already creates this (and the other two
+        // buckets) before the Spring context boots, since MinioXmlPresignAdapter now
+        // headBuckets all three at @PostConstruct. Kept here so this class does not
+        // silently depend on that base-class timing detail.
         try {
             seeder.createBucket(CreateBucketRequest.builder()
-                .bucket(storageProperties.getXmlBucket()).build());
+                .bucket(storageProperties.getOriginalBucket()).build());
         } catch (BucketAlreadyOwnedByYouException | BucketAlreadyExistsException ignore) {
             // already exists — safe to use
         }
@@ -473,7 +477,7 @@ class DecisionEndpointIT extends IntegrationTestBase {
 
     private String seedXml(String body) {
         String key = "2026/07/10/01/transcript-" + UUID.randomUUID() + ".xml";
-        seeder.putObject(req -> req.bucket(storageProperties.getXmlBucket()).key(key),
+        seeder.putObject(req -> req.bucket(storageProperties.getOriginalBucket()).key(key),
             RequestBody.fromString(body, StandardCharsets.UTF_8));
         return key;
     }

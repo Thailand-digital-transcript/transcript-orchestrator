@@ -1,6 +1,7 @@
 package com.wpanther.transcript.orchestrator.integration;
 
 import com.wpanther.transcript.orchestrator.application.port.out.XmlReadPort;
+import com.wpanther.transcript.orchestrator.domain.model.StorageRef;
 import com.wpanther.transcript.orchestrator.infrastructure.config.StorageProperties;
 import com.wpanther.transcript.orchestrator.integration.support.IntegrationTestBase;
 import org.junit.jupiter.api.AfterAll;
@@ -58,21 +59,24 @@ class XmlReadPortIT extends IntegrationTestBase {
 
     @Test
     void streamsAndClosesWithoutLeak() throws Exception {
-        String key = seedXml("<tc:Transcript>hello</tc:Transcript>");
+        StorageRef ref = seedXml("<tc:Transcript>hello</tc:Transcript>");
 
         for (int i = 0; i < 50; i++) {
-            try (var in = xmlReadPort.getObjectStream(key)) {
+            try (var in = xmlReadPort.getObjectStream(ref)) {
                 String body = new String(in.readAllBytes(), StandardCharsets.UTF_8);
                 assertThat(body).contains("Transcript");
             }
         }
     }
 
-    /** Upload a tiny XML payload to the test bucket and return the storage key. */
-    private String seedXml(String body) {
-        String bucket = storageProperties.getXmlBucket();
-        // MinIO starts with an empty namespace, so create the bucket on first use.
-        // Tolerate parallel creators via the "already exists / already owned" sentinels.
+    /**
+     * Upload a tiny XML payload to the test bucket and return the storage ref. This test
+     * exercises the raw read path directly (not through {@code TranscriptKeyResolver}), so
+     * the key does not need to conform to the transcript key layout — only the bucket
+     * matters, and {@code IntegrationTestBase} already guarantees it exists before boot.
+     */
+    private StorageRef seedXml(String body) {
+        String bucket = storageProperties.getSignedBucket();
         try {
             seeder.createBucket(CreateBucketRequest.builder().bucket(bucket).build());
         } catch (BucketAlreadyOwnedByYouException | BucketAlreadyExistsException ignore) {
@@ -81,6 +85,6 @@ class XmlReadPortIT extends IntegrationTestBase {
         String key = "it-read/" + UUID.randomUUID() + ".xml";
         seeder.putObject(req -> req.bucket(bucket).key(key),
             RequestBody.fromString(body, StandardCharsets.UTF_8));
-        return key;
+        return new StorageRef(bucket, key);
     }
 }
